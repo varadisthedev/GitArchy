@@ -1,0 +1,2 @@
+pyspark>=3.5,<5.0
+websockets>=13,<18
