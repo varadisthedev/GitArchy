@@ -1,0 +1,123 @@
+"""Gitarchey API entrypoint."""
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from app.api.dependencies import Context
+from app.api.router import api_router
+from app.core.config import Settings, get_settings
+from app.core.exceptions import install_handlers
+from app.core.logging import setup_logging
+from app.core.middleware import RequestContextMiddleware
+from app.core.rate_limit import Limiter
+from app.integrations.git.manager import GitManager
+from app.integrations.git.storage import LocalRepositoryStorage
+
+log = logging.getLogger("gitarchey")
+
+
+async def build_store(settings: Settings):
+    """Pick the DB backend. No fallback: DATABASE_BACKEND=astra + unreachable Astra => startup fails."""
+    if settings.database_backend == "memory":
+        from app.integrations.astra.memory import MemoryStore
+        log.warning("using_memory_database", extra={"note": "data is lost on restart; not for production"})
+        return MemoryStore()
+    from app.integrations.astra.client import connect_sync
+    from app.integrations.astra.repositories import AstraStore
+    from app.integrations.astra.schema import migrate
+    _, session = await asyncio.to_thread(connect_sync, settings)
+    if settings.astra_auto_migrate:
+        applied = await asyncio.to_thread(migrate, session)
+        log.info("schema_migrated", extra={"versions": applied})
+    store = AstraStore(session)
+    await store.ping()
+    return store
+
+
+def create_app(settings: Settings | None = None, store=None) -> FastAPI:
+    settings = settings or get_settings()
+    setup_logging(settings.log_level)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        st = store or await build_store(settings)
+        storage = LocalRepositoryStorage(settings.git_repos_dir)
+        git = GitManager(settings, storage)
+        log.info("git_ready", extra={"version": await asyncio.to_thread(git.version)})  # fails fast if git missing
+        ctx = Context(settings=settings, store=st, git=git, storage=storage, limiter=Limiter(settings))
+        if settings.r2_configured:
+            from app.integrations.r2.client import R2Client
+            ctx.r2 = R2Client(settings)
+        else:
+            log.warning("r2_not_configured")
+        if settings.cloudinary_configured:
+            from app.integrations.cloudinary.client import CloudinaryClient
+            ctx.cloudinary = CloudinaryClient(settings)
+        else:
+            log.warning("cloudinary_not_configured")
+        if settings.workers_enabled:
+            from app.integrations.spark.job_manager import JobManager
+            from app.modules.analytics.datasets import build_dataset
+            ctx.jobs = JobManager(st, settings, lambda job: build_dataset(ctx, job))
+            await ctx.jobs.start()
+        else:
+            log.warning("analytics_disabled", extra={"note": "WORKER_TOKEN not set"})
+        app.state.ctx = ctx
+        log.info("startup_complete", extra={"env": settings.app_env, "db": st.kind})
+        try:
+            yield
+        finally:
+            if ctx.jobs:
+                await ctx.jobs.stop()
+            await st.close()
+            log.info("shutdown_complete")
+
+    app = FastAPI(title="Gitarchey API", version="0.1.0", lifespan=lifespan,
+                  docs_url=None if settings.is_prod else "/docs",
+                  redoc_url=None, openapi_url=None if settings.is_prod else "/openapi.json")
+    install_handlers(app)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+    app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=False,
+                       allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+                       allow_headers=["Authorization", "Content-Type"], expose_headers=["X-Request-ID"])
+    app.add_middleware(RequestContextMiddleware, max_body=settings.max_request_body_bytes,
+                       max_upload=settings.max_upload_bytes, hsts=settings.is_prod)
+    app.include_router(api_router)
+
+    @app.get("/health", tags=["ops"])
+    async def health():
+        return {"status": "ok"}
+
+    @app.get("/ready", tags=["ops"])
+    async def ready(request: Request):
+        """Required: database + git. Optional integrations are reported as configured/not, never pinged for secrets."""
+        ctx: Context = request.app.state.ctx
+        checks = {}
+        try:
+            await asyncio.wait_for(ctx.store.ping(), 5)
+            checks["database"] = ctx.store.kind
+        except Exception:
+            checks["database"] = "unavailable"
+        try:
+            await asyncio.to_thread(ctx.git.version)
+            checks["git"] = "ok"
+        except Exception:
+            checks["git"] = "unavailable"
+        ok = checks["database"] != "unavailable" and checks["git"] == "ok"
+        optional = {"r2": bool(ctx.r2), "cloudinary": bool(ctx.cloudinary),
+                    "analytics_enabled": bool(ctx.jobs), "spark_worker_connected": bool(ctx.jobs and ctx.jobs.worker_available)}
+        return JSONResponse({"status": "ready" if ok else "not_ready", "checks": checks, "optional": optional},
+                            200 if ok else 503)
+
+    return app
+
+
+def __getattr__(name):  # lazy `app` so importing this module in tests doesn't build settings
+    if name == "app":
+        return create_app()
+    raise AttributeError(name)
