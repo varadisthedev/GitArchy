@@ -11,7 +11,16 @@ import { InlineError, Spinner } from "@/components/ui/states";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // only same-site absolute paths: never "//evil.com" or "https://…"
-const safeNext = (n?: string) => (n && n.startsWith("/") && !n.startsWith("//") ? n : "/dashboard");
+// Same-origin paths only. Resolving against a throwaway origin catches "//host", "/\host" and control-char tricks.
+const safeNext = (n?: string) => {
+  if (!n?.startsWith("/")) return "/dashboard";
+  try {
+    const u = new URL(n, "http://same.invalid");
+    return u.origin === "http://same.invalid" ? u.pathname + u.search + u.hash : "/dashboard";
+  } catch {
+    return "/dashboard";
+  }
+};
 
 function useRedirectIfAuthed(next: string) {
   const { status } = useSession();
