@@ -76,8 +76,20 @@ class RequestContextMiddleware:
                                     "headers": [(b"content-type", b"application/json"),
                                                 (b"content-length", str(len(body)).encode())]})
                 await send_wrapper({"type": "http.response.body", "body": body})
+        except Exception as exc:
+            # handled here (not by Starlette's outermost handler) so the 500 still carries X-Request-ID + headers
+            logging.getLogger("gitarchey.errors").error("unhandled_exception", exc_info=exc,
+                                                       extra={"path": scope["path"]})
+            if not started["v"]:
+                status["v"] = 500
+                body = json.dumps({"error": {"code": "internal_error", "message": "Internal server error",
+                                             "request_id": rid}}).encode()
+                await send_wrapper({"type": "http.response.start", "status": 500,
+                                    "headers": [(b"content-type", b"application/json"),
+                                                (b"content-length", str(len(body)).encode())]})
+                await send_wrapper({"type": "http.response.body", "body": body})
         finally:
             log.info("request", extra={
-                "method": scope["method"], "path": scope["path"], "status": status["v"],
+                "request_id": rid, "method": scope["method"], "path": scope["path"], "status": status["v"],
                 "duration_ms": round((time.perf_counter() - start) * 1000, 1),
                 "user_id": scope.get("state", {}).get("user_id")})

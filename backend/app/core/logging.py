@@ -54,7 +54,8 @@ class JsonFormatter(logging.Formatter):
 def setup_logging(level: str = "INFO") -> None:
     h = logging.StreamHandler(sys.stdout)
     h.setFormatter(JsonFormatter())
+    h._gitarchey = True  # replace only our own handler, so test/other handlers survive re-setup
     root = logging.getLogger()
-    root.handlers[:] = [h]
+    root.handlers[:] = [x for x in root.handlers if not getattr(x, "_gitarchey", False)] + [h]
     root.setLevel(level.upper())
     logging.getLogger("uvicorn.access").disabled = True  # replaced by our access log
