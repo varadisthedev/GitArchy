@@ -1,0 +1,590 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-13T21:39:11+00:00",
+  "title": "Design System: Gitarchy",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Warm Graphite",
+        "canonical": "#19191a",
+        "tonalRamp": [
+          "oklch(15% 0.002 286.2)",
+          "oklch(25% 0.002 286.2)",
+          "oklch(35% 0.002 286.2)",
+          "oklch(45% 0.002 286.2)",
+          "oklch(55% 0.002 286.2)",
+          "oklch(68% 0.002 286.2)",
+          "oklch(82% 0.002 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "shell": {
+        "role": "neutral",
+        "displayName": "Shell Graphite",
+        "canonical": "#141415",
+        "tonalRamp": [
+          "oklch(15% 0.002 286.2)",
+          "oklch(25% 0.002 286.2)",
+          "oklch(35% 0.002 286.2)",
+          "oklch(45% 0.002 286.2)",
+          "oklch(55% 0.002 286.2)",
+          "oklch(68% 0.002 286.2)",
+          "oklch(82% 0.002 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "deep": {
+        "role": "neutral",
+        "displayName": "Well Black",
+        "canonical": "#0a0a0a",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(68% 0.000 89.9)",
+          "oklch(82% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface Graphite",
+        "canonical": "#2a2a2a",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(68% 0.000 89.9)",
+          "oklch(82% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised Graphite",
+        "canonical": "#363636",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(68% 0.000 89.9)",
+          "oklch(82% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#363636",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(68% 0.000 89.9)",
+          "oklch(82% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Soft Rule",
+        "canonical": "#262627",
+        "tonalRamp": [
+          "oklch(15% 0.002 286.3)",
+          "oklch(25% 0.002 286.3)",
+          "oklch(35% 0.002 286.3)",
+          "oklch(45% 0.002 286.3)",
+          "oklch(55% 0.002 286.3)",
+          "oklch(68% 0.002 286.3)",
+          "oklch(82% 0.002 286.3)",
+          "oklch(95% 0.002 286.3)"
+        ]
+      },
+      "stone": {
+        "role": "primary",
+        "displayName": "Weathered Stone",
+        "canonical": "#938a87",
+        "tonalRamp": [
+          "oklch(15% 0.012 39.4)",
+          "oklch(25% 0.012 39.4)",
+          "oklch(35% 0.012 39.4)",
+          "oklch(45% 0.012 39.4)",
+          "oklch(55% 0.012 39.4)",
+          "oklch(68% 0.012 39.4)",
+          "oklch(82% 0.012 39.4)",
+          "oklch(95% 0.012 39.4)"
+        ]
+      },
+      "stone-2": {
+        "role": "primary",
+        "displayName": "Dim Stone",
+        "canonical": "#605e5e",
+        "tonalRamp": [
+          "oklch(15% 0.003 17.2)",
+          "oklch(25% 0.003 17.2)",
+          "oklch(35% 0.003 17.2)",
+          "oklch(45% 0.003 17.2)",
+          "oklch(55% 0.003 17.2)",
+          "oklch(68% 0.003 17.2)",
+          "oklch(82% 0.003 17.2)",
+          "oklch(95% 0.003 17.2)"
+        ]
+      },
+      "stone-hi": {
+        "role": "primary",
+        "displayName": "Pale Stone",
+        "canonical": "#cfc6c2",
+        "tonalRamp": [
+          "oklch(15% 0.012 45.7)",
+          "oklch(25% 0.012 45.7)",
+          "oklch(35% 0.012 45.7)",
+          "oklch(45% 0.012 45.7)",
+          "oklch(55% 0.012 45.7)",
+          "oklch(68% 0.012 45.7)",
+          "oklch(82% 0.012 45.7)",
+          "oklch(95% 0.012 45.7)"
+        ]
+      },
+      "fg": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "#f3f0ee",
+        "tonalRamp": [
+          "oklch(15% 0.004 56.4)",
+          "oklch(25% 0.004 56.4)",
+          "oklch(35% 0.004 56.4)",
+          "oklch(45% 0.004 56.4)",
+          "oklch(55% 0.004 56.4)",
+          "oklch(68% 0.004 56.4)",
+          "oklch(82% 0.004 56.4)",
+          "oklch(95% 0.004 56.4)"
+        ]
+      },
+      "fg-2": {
+        "role": "neutral",
+        "displayName": "Ash",
+        "canonical": "#b7b0ad",
+        "tonalRamp": [
+          "oklch(15% 0.009 44.9)",
+          "oklch(25% 0.009 44.9)",
+          "oklch(35% 0.009 44.9)",
+          "oklch(45% 0.009 44.9)",
+          "oklch(55% 0.009 44.9)",
+          "oklch(68% 0.009 44.9)",
+          "oklch(82% 0.009 44.9)",
+          "oklch(95% 0.009 44.9)"
+        ]
+      },
+      "fg-3": {
+        "role": "neutral",
+        "displayName": "Metadata Ash",
+        "canonical": "#a39b98",
+        "tonalRamp": [
+          "oklch(15% 0.010 41.8)",
+          "oklch(25% 0.010 41.8)",
+          "oklch(35% 0.010 41.8)",
+          "oklch(45% 0.010 41.8)",
+          "oklch(55% 0.010 41.8)",
+          "oklch(68% 0.010 41.8)",
+          "oklch(82% 0.010 41.8)",
+          "oklch(95% 0.010 41.8)"
+        ]
+      },
+      "fg-4": {
+        "role": "neutral",
+        "displayName": "Spent Ash",
+        "canonical": "#7a7574",
+        "tonalRamp": [
+          "oklch(15% 0.006 31.1)",
+          "oklch(25% 0.006 31.1)",
+          "oklch(35% 0.006 31.1)",
+          "oklch(45% 0.006 31.1)",
+          "oklch(55% 0.006 31.1)",
+          "oklch(68% 0.006 31.1)",
+          "oklch(82% 0.006 31.1)",
+          "oklch(95% 0.006 31.1)"
+        ]
+      },
+      "ok": {
+        "role": "tertiary",
+        "displayName": "Sage",
+        "canonical": "#88c098",
+        "tonalRamp": [
+          "oklch(15% 0.082 153.1)",
+          "oklch(25% 0.082 153.1)",
+          "oklch(35% 0.082 153.1)",
+          "oklch(45% 0.082 153.1)",
+          "oklch(55% 0.082 153.1)",
+          "oklch(68% 0.082 153.1)",
+          "oklch(82% 0.082 153.1)",
+          "oklch(95% 0.082 153.1)"
+        ]
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Amber",
+        "canonical": "#e0b066",
+        "tonalRamp": [
+          "oklch(15% 0.108 77.0)",
+          "oklch(25% 0.108 77.0)",
+          "oklch(35% 0.108 77.0)",
+          "oklch(45% 0.108 77.0)",
+          "oklch(55% 0.108 77.0)",
+          "oklch(68% 0.108 77.0)",
+          "oklch(82% 0.108 77.0)",
+          "oklch(95% 0.108 77.0)"
+        ]
+      },
+      "err": {
+        "role": "tertiary",
+        "displayName": "Brick",
+        "canonical": "#ec8a7c",
+        "tonalRamp": [
+          "oklch(15% 0.122 29.0)",
+          "oklch(25% 0.122 29.0)",
+          "oklch(35% 0.122 29.0)",
+          "oklch(45% 0.122 29.0)",
+          "oklch(55% 0.122 29.0)",
+          "oklch(68% 0.122 29.0)",
+          "oklch(82% 0.122 29.0)",
+          "oklch(95% 0.122 29.0)"
+        ]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Slate",
+        "canonical": "#a4b4c4",
+        "tonalRamp": [
+          "oklch(15% 0.029 248.2)",
+          "oklch(25% 0.029 248.2)",
+          "oklch(35% 0.029 248.2)",
+          "oklch(45% 0.029 248.2)",
+          "oklch(55% 0.029 248.2)",
+          "oklch(68% 0.029 248.2)",
+          "oklch(82% 0.029 248.2)",
+          "oklch(95% 0.029 248.2)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus Bone",
+        "canonical": "#e6dfdb",
+        "tonalRamp": [
+          "oklch(15% 0.009 52.1)",
+          "oklch(25% 0.009 52.1)",
+          "oklch(35% 0.009 52.1)",
+          "oklch(45% 0.009 52.1)",
+          "oklch(55% 0.009 52.1)",
+          "oklch(68% 0.009 52.1)",
+          "oklch(82% 0.009 52.1)",
+          "oklch(95% 0.009 52.1)"
+        ]
+      },
+      "viz-1": {
+        "role": "data-viz",
+        "displayName": "Stone Series",
+        "canonical": "#a39b98",
+        "tonalRamp": [
+          "oklch(15% 0.010 41.8)",
+          "oklch(25% 0.010 41.8)",
+          "oklch(35% 0.010 41.8)",
+          "oklch(45% 0.010 41.8)",
+          "oklch(55% 0.010 41.8)",
+          "oklch(68% 0.010 41.8)",
+          "oklch(82% 0.010 41.8)",
+          "oklch(95% 0.010 41.8)"
+        ]
+      },
+      "viz-cool": {
+        "role": "data-viz",
+        "displayName": "Viz Cool",
+        "canonical": "#5b98d2",
+        "tonalRamp": [
+          "oklch(15% 0.108 248.6)",
+          "oklch(25% 0.108 248.6)",
+          "oklch(35% 0.108 248.6)",
+          "oklch(45% 0.108 248.6)",
+          "oklch(55% 0.108 248.6)",
+          "oklch(68% 0.108 248.6)",
+          "oklch(82% 0.108 248.6)",
+          "oklch(95% 0.108 248.6)"
+        ]
+      },
+      "viz-warm": {
+        "role": "data-viz",
+        "displayName": "Viz Warm",
+        "canonical": "#c47f40",
+        "tonalRamp": [
+          "oklch(15% 0.116 60.8)",
+          "oklch(25% 0.116 60.8)",
+          "oklch(35% 0.116 60.8)",
+          "oklch(45% 0.116 60.8)",
+          "oklch(55% 0.116 60.8)",
+          "oklch(68% 0.116 60.8)",
+          "oklch(82% 0.116 60.8)",
+          "oklch(95% 0.116 60.8)"
+        ]
+      },
+      "viz-grid": {
+        "role": "data-viz",
+        "displayName": "Viz Grid",
+        "canonical": "#2a2a2b",
+        "tonalRamp": [
+          "oklch(15% 0.002 286.3)",
+          "oklch(25% 0.002 286.3)",
+          "oklch(35% 0.002 286.3)",
+          "oklch(45% 0.002 286.3)",
+          "oklch(55% 0.002 286.3)",
+          "oklch(68% 0.002 286.3)",
+          "oklch(82% 0.002 286.3)",
+          "oklch(95% 0.002 286.3)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing headline only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "App, auth and error page titles; landing section heads scale to clamp(1.75rem, 3vw, 2.5rem)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section heads inside a page; landing spine item titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All product UI at weight 450; README prose at 0.9375rem / 1.7, max 78ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons (600), form labels and chips (650)."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Hints, timestamps, table headers, spine day separators."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code wells, hashes, paths, Spark operators, table numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "popover",
+        "value": "0 12px 32px -8px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.35)",
+        "purpose": "Menus and toasts."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 60px -12px rgb(0 0 0 / 0.7)",
+        "purpose": "Modal dialogs, over a rgb(5 5 5 / 0.62) backdrop."
+      },
+      {
+        "name": "field-focus",
+        "value": "0 0 0 3px rgb(207 198 194 / 0.16)",
+        "purpose": "Input focus halo with a stone-hi border."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "House easing for all state transitions."
+      },
+      {
+        "name": "state",
+        "value": "150ms",
+        "purpose": "Hover, colour and border transitions."
+      },
+      {
+        "name": "dialog-in",
+        "value": "180ms",
+        "purpose": "Dialog fade-rise (6px, scale 0.985)."
+      },
+      {
+        "name": "node-pulse",
+        "value": "1.8s infinite",
+        "purpose": "Live amber ring on a running spine node."
+      },
+      {
+        "name": "skeleton",
+        "value": "1.4s ease-in-out infinite",
+        "purpose": "Loading shimmer #232324 to #2c2c2d."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All animation and transition collapsed under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Rail docks; below it the rail is a modal drawer."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Compact surface button for secondary actions.",
+      "html": "<button class=\"ds-btn\">Branches</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:.4rem;height:2rem;padding:0 .75rem;border-radius:4px;font:600 .8125rem/1 var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1),border-color 150ms cubic-bezier(.16,1,.3,1),color 150ms cubic-bezier(.16,1,.3,1);border:1px solid #363636;background:#2a2a2a;color:#f3f0ee}.ds-btn:hover{background:#363636;border-color:#4a4848}.ds-btn:active{transform:translateY(.5px)}.ds-btn:focus-visible{outline:2px solid #e6dfdb;outline-offset:2px}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Inverted bone button; one per view.",
+      "html": "<button class=\"ds-btn-primary\">Create an account <svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14M12 5l7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:.4rem;height:2rem;padding:0 .75rem;border-radius:4px;font:600 .8125rem/1 var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1),border-color 150ms cubic-bezier(.16,1,.3,1),color 150ms cubic-bezier(.16,1,.3,1);border:1px solid #f3f0ee;background:#f3f0ee;color:#19191a}.ds-btn-primary:hover{background:#fffdfb;border-color:#fffdfb}.ds-btn-primary:active{transform:translateY(.5px)}.ds-btn-primary:focus-visible{outline:2px solid #e6dfdb;outline-offset:2px}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Chrome and toolbar actions.",
+      "html": "<button class=\"ds-btn-ghost\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg>New</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:.4rem;height:2rem;padding:0 .75rem;border-radius:4px;font:600 .8125rem/1 var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1),border-color 150ms cubic-bezier(.16,1,.3,1),color 150ms cubic-bezier(.16,1,.3,1);border:1px solid transparent;background:transparent;color:#b7b0ad}.ds-btn-ghost:hover{background:#2a2a2a;color:#f3f0ee}.ds-btn-ghost:focus-visible{outline:2px solid #e6dfdb;outline-offset:2px}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive action, outlined in brick.",
+      "html": "<button class=\"ds-btn-danger\">Cancel job</button>",
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;gap:.4rem;height:2rem;padding:0 .75rem;border-radius:4px;font:600 .8125rem/1 var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1),border-color 150ms cubic-bezier(.16,1,.3,1),color 150ms cubic-bezier(.16,1,.3,1);border:1px solid rgb(236 138 124/.4);background:transparent;color:#ec8a7c}.ds-btn-danger:hover{background:rgb(236 138 124/.12);border-color:#ec8a7c}.ds-btn-danger:focus-visible{outline:2px solid #e6dfdb;outline-offset:2px}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Sunk well-black field with stone focus.",
+      "html": "<label class=\"ds-label\">Repository name<input class=\"ds-input\" placeholder=\"ledger-service\"></label>",
+      "css": ".ds-label{display:block;font:650 .8125rem/1.125rem var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;color:#f3f0ee}.ds-input{display:block;margin-top:.35rem;width:16rem;height:2.25rem;padding:0 .7rem;border-radius:4px;border:1px solid #4a4848;background:#0a0a0a;color:#f3f0ee;font:450 .875rem var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;caret-color:#cfc6c2;transition:border-color 150ms cubic-bezier(.16,1,.3,1)}.ds-input::placeholder{color:#7a7574}.ds-input:hover{border-color:#605e5e}.ds-input:focus-visible{outline:none;border-color:#cfc6c2;box-shadow:0 0 0 3px rgb(207 198 194/.16)}"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Square chip pairing glyph and label; never colour alone.",
+      "html": "<span class=\"ds-chip\"><svg width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#e0b066\" stroke-width=\"2.4\"><circle cx=\"12\" cy=\"12\" r=\"9\" stroke-dasharray=\"4 3\"/></svg>Waiting for worker</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:.3rem;height:1.25rem;padding:0 .4rem;border-radius:3px;border:1px solid #363636;font:650 .6875rem/1 var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;letter-spacing:.02em;color:#b7b0ad;white-space:nowrap}"
+    },
+    {
+      "name": "Rail Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Side rail drawn as a spine; the current page is the filled stone node.",
+      "html": "<ul class=\"ds-nav\"><li><a href=\"#\">Overview</a></li><li><a href=\"#\" aria-current=\"page\">Analytics</a></li><li><a href=\"#\">Activity</a></li></ul>",
+      "css": ".ds-nav{position:relative;list-style:none;margin:0;padding:.5rem;width:14rem;background:#141415}.ds-nav::before{content:'';position:absolute;top:16px;bottom:16px;left:25px;width:1px;background:#363636}.ds-nav a{position:relative;display:flex;align-items:center;height:2rem;padding:0 .5rem 0 2rem;border-radius:4px;color:#b7b0ad;font:500 .84375rem var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;text-decoration:none;transition:background-color 150ms cubic-bezier(.16,1,.3,1),color 150ms cubic-bezier(.16,1,.3,1)}.ds-nav a::before{content:'';position:absolute;left:14px;width:7px;height:7px;border-radius:999px;border:1px solid transparent}.ds-nav a:hover{background:rgb(42 42 42/.6);color:#f3f0ee}.ds-nav a:hover::before{border-color:#605e5e;background:#141415}.ds-nav a[aria-current=page]{background:#2a2a2a;color:#f3f0ee}.ds-nav a[aria-current=page]::before{background:#938a87;border-color:#938a87}.ds-nav a:focus-visible{outline:2px solid #e6dfdb;outline-offset:2px}"
+    },
+    {
+      "name": "Commit Spine",
+      "kind": "custom",
+      "refersTo": "spine",
+      "description": "Signature: 1px rail with toned ring nodes for history, feeds, nav and the job lifecycle.",
+      "html": "<ol class=\"ds-spine\"><li><span class=\"ds-node\" data-tone=\"solid\"></span><b>Fix rounding in fee calculation</b><small><code>41ab7d0</code> Kofi Mensah, 5h ago</small></li><li><span class=\"ds-node\" data-tone=\"ok\"></span><b>Dispatched to worker</b><small>2 minutes ago</small></li><li><span class=\"ds-node\" data-tone=\"warn\" data-live=\"true\"></span><b>Running on Spark</b><small><code>map, reduceByKey</code></small></li></ol>",
+      "css": ".ds-spine{list-style:none;margin:0;padding:0;background:#19191a;color:#f3f0ee;font:450 .875rem/1.375rem var(--font-urbanist), ui-sans-serif, system-ui, sans-serif}.ds-spine li{position:relative;padding:0 0 1rem 2rem}.ds-spine li::before{content:'';position:absolute;left:10.5px;top:0;bottom:0;width:1px;background:#605e5e}.ds-spine li:first-child::before{top:1.05rem}.ds-spine li:last-child::before{bottom:calc(100% - 1.05rem)}.ds-spine b{display:block;font-weight:650}.ds-spine small{display:block;font-size:.75rem;line-height:1rem;color:#a39b98}.ds-spine code{font-family:var(--font-jetbrains), ui-monospace, monospace}.ds-node{position:absolute;left:6px;top:.74rem;width:10px;height:10px;box-sizing:border-box;border-radius:999px;background:#19191a;border:1.5px solid #938a87;z-index:1}.ds-node[data-tone=solid]{background:#938a87}.ds-node[data-tone=ok]{border-color:#88c098}.ds-node[data-tone=warn]{border-color:#e0b066}.ds-node[data-live=true]::after{content:'';position:absolute;inset:-4px;border-radius:999px;border:1px solid #e0b066;animation:ds-pulse 1.8s cubic-bezier(.16,1,.3,1) infinite}@keyframes ds-pulse{from{transform:scale(.6);opacity:.7}to{transform:scale(1.5);opacity:0}}@media (prefers-reduced-motion:reduce){.ds-node::after{animation:none}}"
+    },
+    {
+      "name": "Code Well",
+      "kind": "custom",
+      "refersTo": "code-well",
+      "description": "Well-black code view with line gutter and stone line highlight.",
+      "html": "<pre class=\"ds-code\"><div><span>1</span><span><i>def</i> fee(amount):</span></div><div class=\"hl\"><span>2</span><span>    <i>return</i> raw.quantize(<em>\"0.01\"</em>)</span></div></pre>",
+      "css": ".ds-code{margin:0;padding:.5rem 0;background:#0a0a0a;color:#e6e1de;font:400 .8125rem/1.35rem var(--font-jetbrains), ui-monospace, monospace;font-variant-ligatures:none}.ds-code div{display:flex}.ds-code div>span:first-child{width:3.5rem;padding:0 .85rem 0 .5rem;text-align:right;color:#6a6564;user-select:none}.ds-code div:hover>span:first-child{color:#b7b0ad}.ds-code .hl{background:rgb(147 138 135/.14)}.ds-code span:last-child{white-space:pre}.ds-code i{font-style:normal;color:#d6b49b}.ds-code em{font-style:normal;color:#a9c6a2}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Stone Ledger",
+    "overview": "Gitarchy is a dark, warm-graphite developer workspace where repository hosting and Spark analytics share one visual grammar. Everything is a ledger: rows ruled by 1px lines, history threaded down a single vertical rail, code sunk into near-black wells. The accent is a desaturated warm stone, used sparingly enough that it reads as \"you are here\" rather than decoration.\n\nDensity is high and calm. Product UI runs on a 14px body with a tight 1.2 scale; only the landing page is allowed a large display headline. Depth comes from tonal layering (shell darker than canvas, wells darker still, menus lighter), not from cards or shadows. The one recurring signature is the commit spine: the same rail-and-ring-node form carries commit history, activity feeds, the sidebar nav, the landing feature list and the Spark job lifecycle.",
+    "keyCharacteristics": [
+      "Dark warm-graphite canvas with tonal layers, never pure black UI chrome.",
+      "1px rules instead of cards; corners never exceed 4px.",
+      "Stone accent reserved for selection, the active rail node and spine nodes.",
+      "State colours (sage, amber, brick, slate) appear only where they carry meaning, always with a glyph or label.",
+      "Urbanist for all UI; JetBrains Mono only for code, hashes, paths, Spark operators and table numerals.",
+      "The commit spine is the signature form across hosting and analytics."
+    ],
+    "rules": [
+      {
+        "name": "The Stone Is A Marker Rule",
+        "body": "Stone marks position and selection: the active node, the selected radio card, the highlighted code line. It is not a fill for buttons, banners or headings.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning-Only State Rule",
+        "body": "Sage, amber, brick and slate appear only when the thing is in that state, and always paired with a glyph or text label; colour alone never carries status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Small-Text Floor Rule",
+        "body": "Small text on surface or raised uses fg-3 or lighter. Stone is not small text on surface; fg-4 is disabled-only.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Means Machine Rule",
+        "body": "JetBrains Mono is for code, hashes, paths, branch names, Spark operators and numerals. Never for headings, labels or prose.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Labels, table headers, group labels and day separators are sentence case at normal or near-normal tracking. No uppercase tracked labels.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Tables and data numerals always use tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Floating-Only Shadow Rule",
+        "body": "Only things in the top layer cast shadows. Panels, tables and sections never do; they separate with 1px rules and tone.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do separate regions with 1px rules (line `#363636`, line-soft `#262627`) and tonal steps, not cards.",
+      "Do keep every corner at 4px or less; circles are only for nodes, dots, avatars and progress tracks.",
+      "Do thread any history, feed or multi-step process down the commit spine with toned ring nodes.",
+      "Do pair every state colour with a glyph or a text label.",
+      "Do set code, hashes, paths and Spark operators in JetBrains Mono, and everything else in Urbanist.",
+      "Do use one inverted bone primary button per view; the rest are default, ghost or danger.",
+      "Do transition state changes over 150ms on `cubic-bezier(0.16, 1, 0.3, 1)` and honour reduced motion.",
+      "Do label illustrative content with a \"Sample data\" chip."
+    ],
+    "donts": [
+      "Don't use stone as a button fill, banner, or small text on surface (4.26:1).",
+      "Don't use fg-4 (`#7a7574`) for anything but disabled text and placeholders.",
+      "Don't add shadows to panels, tables or sections; shadows are for menus, dialogs, toasts and tooltips only.",
+      "Don't build hero-metric card grids or a separate admin-dashboard look for analytics; analytics uses the same tables, spine and charts as hosting.",
+      "Don't use uppercase tracked labels or kicker lines above headings.",
+      "Don't set text below 0.6875rem.",
+      "Don't use the state colours for chart polarity; use the cool/warm pair."
+    ]
+  }
+}
