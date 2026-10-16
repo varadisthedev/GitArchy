@@ -58,7 +58,7 @@ class AstraStore:
         if ps is None:
             ps = await asyncio.to_thread(self.s.prepare, cql)  # blocking only on first use
             self._prep[cql] = ps
-        return list(await aio(self.s.execute_async(ps, params)))
+        return list(await aio(self.s.execute_async(ps, params)) or [])
 
     async def _applied(self, cql: str, params: tuple) -> tuple[bool, dict]:
         rows = await self._x(cql, params)

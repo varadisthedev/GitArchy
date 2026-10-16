@@ -1,4 +1,4 @@
-"""Cloudflare R2 through its S3-compatible API (boto3). Object storage only - never a live Git filesystem."""
+"""Filebase or Cloudflare R2 through its S3-compatible API (boto3). Object storage only - never a live Git filesystem."""
 import asyncio
 import hashlib
 from pathlib import Path
@@ -21,13 +21,17 @@ def sha256_file(path: Path) -> str:
 
 class R2Client:
     def __init__(self, settings: Settings, s3=None):
-        endpoint = settings.r2_endpoint_url or f"https://{settings.r2_account_id}.r2.cloudflarestorage.com"
-        self.bucket = settings.r2_bucket_name
+        if settings.filebase_configured:
+            endpoint, region, key_id = settings.filebase_endpoint_url, "us-east-1", settings.filebase_access_token
+            secret, self.bucket = settings.filebase_secret_key.get_secret_value(), settings.filebase_bucket_name
+        else:
+            endpoint = settings.r2_endpoint_url or f"https://{settings.r2_account_id}.r2.cloudflarestorage.com"
+            region, key_id, self.bucket = "auto", settings.r2_access_key_id, settings.r2_bucket_name
+            secret = settings.r2_secret_access_key.get_secret_value()
         self._timeout = settings.external_timeout_s
         self.s3 = s3 or boto3.client(
-            "s3", endpoint_url=endpoint, region_name="auto",
-            aws_access_key_id=settings.r2_access_key_id,
-            aws_secret_access_key=settings.r2_secret_access_key.get_secret_value(),
+            "s3", endpoint_url=endpoint, region_name=region,
+            aws_access_key_id=key_id, aws_secret_access_key=secret,
             config=Config(signature_version="s3v4", connect_timeout=self._timeout, read_timeout=self._timeout * 3,
                           retries={"max_attempts": 3, "mode": "standard"}))
 

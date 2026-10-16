@@ -148,6 +148,6 @@ def test_migrate_applies_pending_only():
     class S:
         def execute(self, cql, params=None):
             seen.append(cql)
-            return [SimpleNamespace(version=1)] if cql.startswith("SELECT version") else []
+            return [{"version": 1}] if cql.startswith("SELECT version") else []
     assert schema.migrate(S()) == []
     assert not any(c.startswith("CREATE TABLE IF NOT EXISTS users_by_id") for c in seen)

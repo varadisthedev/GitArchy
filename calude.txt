@@ -1,0 +1,57 @@
+
+I built the backend in C:\Users\varad\Desktop\Polished\gitarchy\backend. The default test suite passes (133 passed, 9 skipped), but none of the Astra DB code has run against a real Cassandra.
+
+What I ran
+
+- pytest: 133 passed, 9 skipped. The skips are the opt-in integration tests and the Spark tests, which skip when PySpark isn't installed.
+- Live server: I ran uvicorn with the in-memory database and drove it over HTTP: register, login, logout, create repo, commits, branch, tree, history, path-traversal rejection and 401s.
+- Spark: PySpark 4.2.0 on Java 25 and Python 3.14 passed the 5 Spark task tests. colab_worker/worker.py then ran all five task types against the live server. Jobs stayed queued with worker_unavailable until the worker connected. After I killed and restarted the server, the worker reconnected on its own.
+- Native Git: with RUN_INTEGRATION=1, a bundle export clones back byte-identical and passes git fsck.
+
+What I did not run
+
+- Astra DB / Cassandra: Docker Desktop wasn't running, so even the local-Cassandra check never happened. The CQL in schema.py and repositories.py has only been checked with a fake driver.
+- R2 and Cloudinary: both were tested with mocked clients only.
+- Deployment and Colab: I did not try a Render deployment or a real Colab session.
+
+Before relying on the database layer, run RUN_INTEGRATION=1 CASSANDRA_HOST=127.0.0.1 pytest tests/integration/test_astra_cql.py against Cassandra 5, or point it at Astra.
+
+How it behaves
+
+- Database fallback: DATABASE_BACKEND=memory is the only way to get the in-memory store. With astra selected, the app refuses to start if Astra is unreachable, and APP_ENV=production rejects memory outright.
+- Git storage: Git runs through the real CLI with commits built from a temporary index and no working tree. Live repositories need a persistent disk. R2 only holds verified bundle exports and uploads, and there is no automatic restore.
+- Not implemented: git clone and git push over HTTP.
+- Logout: it really revokes the token (checked on every request).
+- Avatars: the server uploads them to Cloudinary, so the browser never gets a signature. This is a deviation from "generate upload parameters"; the secret never leaves the server.
+- Limits that will matter when you scale:
+  - Rate-limit counters are per process.
+  - The repo write lock is per process.
+  - Worker connections are held in one API instance.
+  - Use one API instance until you add shared storage.
+
+Things I found along the way
+
+- Cassandra driver on Python 3.12+: it needs the pyasyncore package to import at all. I added it to requirements.txt.
+- Windows repo deletion: deleting a repo failed because Git's object files are read-only. Fixed.
+- Deleting a file in a bare repo: update-index --force-remove doesn't work there. It now uses --index-info.
+- 500 responses: they were missing X-Request-ID. Fixed.
+- Colab worker: the worker needs numpy for the MLlib tasks, and a stale PYSPARK_PYTHON on this machine broke executors. The worker now forces its own interpreter.
+- Spark job duration: K-Means took about 130 s and logistic regression about 110 s on tiny data locally. The 900 s job limit covers it.
+
+Run it
+
+Setup commands for Windows and Linux/macOS are in README.md. To run the tests:
+pip install -r requirements-dev.txt
+pytest
+RUN_INTEGRATION=1 pytest -m integration
+Spark tests run in a worker environment with pytest --noconftest tests/unit/test_spark_tasks.py.
+
+Next steps for the frontend
+
+- Hit /api/v1 with Authorization: Bearer, and add the Vercel origin to ALLOWED_ORIGINS.
+- For live progress, open WS /analytics/jobs/{id}/stream and send {"type":"auth","token":"<jwt>"} as the first frame.
+- Error shape and routes are in docs/api.md.
+
+Everything is under backend/. Start with README.md, then docs/api.md and docs/colab-setup.md. The code itself is in app/ and colab_worker/.
+
+✻ Cogitated for 42m 14s · done 3:39 PM

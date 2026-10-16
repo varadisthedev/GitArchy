@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     r2_secret_access_key: SecretStr = SecretStr("")
     r2_bucket_name: str = ""
     r2_endpoint_url: str = ""
+    # filebase (S3-compatible; takes precedence over r2 when configured)
+    filebase_access_token: str = ""
+    filebase_secret_key: SecretStr = SecretStr("")
+    filebase_endpoint_url: str = "https://s3.filebase.com"
+    filebase_bucket_name: str = ""
     external_timeout_s: float = 10.0
 
     # cloudinary
@@ -126,8 +131,12 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def filebase_configured(self) -> bool:
+        return all([self.filebase_access_token, self.filebase_secret_key.get_secret_value(), self.filebase_bucket_name])
+
+    @property
     def r2_configured(self) -> bool:
-        return all([self.r2_access_key_id, self.r2_secret_access_key.get_secret_value(),
+        return self.filebase_configured or all([self.r2_access_key_id, self.r2_secret_access_key.get_secret_value(),
                     self.r2_bucket_name, self.r2_endpoint_url or self.r2_account_id])
 
     @property

@@ -69,7 +69,7 @@ VERSION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (
 def migrate(session) -> list[int]:
     """Apply pending migrations in order. Returns versions applied."""
     session.execute(VERSION_TABLE)
-    done = {r.version for r in session.execute("SELECT version FROM schema_migrations")}
+    done = {r["version"] for r in session.execute("SELECT version FROM schema_migrations")}
     applied = []
     for version, desc, stmts in MIGRATIONS:
         if version in done:
