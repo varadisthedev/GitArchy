@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # database: "astra" (default, required in prod) or "memory" (explicit opt-in, never in prod)
     database_backend: Literal["astra", "memory"] = "astra"
     astra_secure_bundle_path: str = ""
+    astra_secure_bundle_b64: SecretStr = SecretStr("")  # base64 of the zip, for hosts without binary secret files
     astra_application_token: SecretStr = SecretStr("")
     astra_keyspace: str = ""
     astra_auto_migrate: bool = False
@@ -122,7 +123,8 @@ class Settings(BaseSettings):
             log.warning("JWT_SECRET unset/short: using an ephemeral dev secret")
         if self.database_backend == "astra":
             missing = [n for n, v in (
-                ("ASTRA_SECURE_BUNDLE_PATH", self.astra_secure_bundle_path),
+                ("ASTRA_SECURE_BUNDLE_PATH or ASTRA_SECURE_BUNDLE_B64",
+                 self.astra_secure_bundle_path or self.astra_secure_bundle_b64.get_secret_value()),
                 ("ASTRA_APPLICATION_TOKEN", self.astra_application_token.get_secret_value()),
                 ("ASTRA_KEYSPACE", self.astra_keyspace)) if not v]
             if missing:
