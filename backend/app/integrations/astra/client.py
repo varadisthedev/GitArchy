@@ -23,8 +23,8 @@ def _bundle_path(settings: Settings) -> str:
     b64 = settings.astra_secure_bundle_b64.get_secret_value()
     if not b64:
         return settings.astra_secure_bundle_path
-    path = os.path.join(tempfile.gettempdir(), "astra-secure-bundle.zip")
-    with open(path, "wb") as f:
+    fd, path = tempfile.mkstemp(prefix="astra-bundle-", suffix=".zip")  # random name, mode 0600
+    with os.fdopen(fd, "wb") as f:
         f.write(base64.b64decode(b64))
     return path
 
