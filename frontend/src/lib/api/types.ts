@@ -101,7 +101,15 @@ export type FileChange =
 
 export interface ActivityEvent {
   id: string;
-  type: "repo.created" | "repo.updated" | "branch.created" | "commit.created" | "member.set" | "member.removed" | string;
+  type:
+    | "repo.created"
+    | "repo.imported"
+    | "repo.updated"
+    | "branch.created"
+    | "commit.created"
+    | "member.set"
+    | "member.removed"
+    | string;
   actor_id: string;
   repo_id: string;
   data: Record<string, unknown>;
@@ -114,6 +122,49 @@ export interface Notification {
   data: Record<string, unknown>;
   read: boolean;
   ts: string;
+}
+
+// ---- github ----
+export interface GithubStatus {
+  configured: boolean;
+  connected: boolean;
+  login: string | null;
+  avatar_url: string | null;
+  can_import_private: boolean;
+}
+
+export interface GithubRepo {
+  full_name: string;
+  name: string;
+  owner: string;
+  description: string;
+  private: boolean;
+  fork: boolean;
+  archived: boolean;
+  empty: boolean;
+  default_branch: string;
+  language: string | null;
+  size_kb: number;
+  stars: number;
+  pushed_at: string | null;
+  /** a repository of this name already exists here (matched by name, so it can be a false positive) */
+  imported: boolean;
+  /** false when empty or over the server's size limit */
+  importable: boolean;
+}
+
+export interface ImportResult {
+  repo: Repo;
+  source: string;
+  branches: number;
+  commits_indexed: number;
+}
+
+export interface GithubCallbackResult {
+  mode: "signin" | "connect";
+  login: string | null;
+  next: string | null;
+  token: TokenResponse | null;
 }
 
 export interface ExportResult {

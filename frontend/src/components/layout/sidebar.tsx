@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  Activity, ArrowLeft, BookMarked, ChartNoAxesColumn, FileCode2, GitBranch, GitCommitHorizontal, LayoutDashboard,
-  Settings, type LucideIcon,
+  Activity, ArrowLeft, BookMarked, ChartNoAxesColumn, CloudDownload, FileCode2, GitBranch,
+  GitCommitHorizontal, LayoutDashboard, Settings, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ type Item = { href: string; label: string; icon: LucideIcon; match: (p: string) 
 const GLOBAL: Item[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, match: (p) => p === "/dashboard" },
   { href: "/repositories", label: "Repositories", icon: BookMarked, match: (p) => p === "/repositories" || p === "/repositories/new" },
+  { href: "/import/github", label: "Import", icon: CloudDownload, match: (p) => p.startsWith("/import") },
   { href: "/activity", label: "Activity", icon: Activity, match: (p) => p.startsWith("/activity") },
   { href: "/analytics", label: "Analytics", icon: ChartNoAxesColumn, match: (p) => p.startsWith("/analytics") },
 ];

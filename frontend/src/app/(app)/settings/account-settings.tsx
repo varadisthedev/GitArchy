@@ -1,12 +1,17 @@
 "use client";
 
 import { ImageUp, LogOut, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { isApiError } from "@/lib/api/client";
-import { useDeleteAvatar, useMe, useReady, useRepos, useUploadAvatar, useUpdateMe } from "@/lib/api/queries";
+import {
+  useDeleteAvatar, useDisconnectGithub, useGithubStatus, useMe, useReady, useRepos, useUploadAvatar,
+  useUpdateMe,
+} from "@/lib/api/queries";
 import { useSession } from "@/lib/auth/session";
 import { fullDate } from "@/lib/format";
 import { Avatar } from "@/components/ui/bits";
+import { GithubButton, GithubMark } from "@/components/auth/github-button";
 import { ErrorState, InlineError, PageHeader, Skeleton, Spinner } from "@/components/ui/states";
 
 const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -39,6 +44,9 @@ export function AccountSettings() {
       </Section>
       <Section id="acc-h" title="Account" description="Email can't be changed yet, and there's no password reset or account deletion on this server.">
         <AccountInfo />
+      </Section>
+      <Section id="gh-h" title="GitHub" description="Connect GitHub to import repositories with their full history. Gitarchy stores the token on the server and only ever reads.">
+        <GithubConnection />
       </Section>
       <Section id="ses-h" title="Session" description="Sessions last 30 minutes and aren't refreshed. Signing out revokes this session's token on the server.">
         <SessionInfo />
@@ -183,6 +191,44 @@ function SessionInfo() {
       <button className="btn" disabled={busy} onClick={async () => { setBusy(true); await logout(); }}>
         {busy ? <Spinner /> : <LogOut aria-hidden />} Sign out
       </button>
+    </div>
+  );
+}
+
+function GithubConnection() {
+  const status = useGithubStatus();
+  const disconnect = useDisconnectGithub();
+  if (status.isPending) return <Skeleton className="h-16" />;
+  if (status.data && !status.data.configured) {
+    return <p className="text-sm text-fg-2">GitHub isn&apos;t configured on this server.</p>;
+  }
+  if (!status.data?.connected) {
+    return (
+      <div className="max-w-xs">
+        <GithubButton mode="connect" next="/import/github" label="Connect GitHub account" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <p className="flex items-center gap-2 text-sm text-fg-2">
+        <GithubMark />
+        <span className="font-bold text-fg">{status.data.login}</span>
+        <span className="text-2xs text-fg-3">{status.data.can_import_private ? "public + private" : "public only"}</span>
+      </p>
+      <Link href="/import/github" className="btn btn-sm">
+        Import repositories
+      </Link>
+      <button
+        className="btn btn-sm"
+        disabled={disconnect.isPending}
+        onClick={() => disconnect.mutate(undefined)}
+        // imported repositories are Gitarchy's own copies and are not touched by disconnecting
+        title="Forget the stored GitHub token. Imported repositories stay."
+      >
+        {disconnect.isPending ? <Spinner /> : null} Disconnect
+      </button>
+      {disconnect.error ? <InlineError error={disconnect.error} /> : null}
     </div>
   );
 }

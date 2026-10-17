@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { api, API_BASE } from "./client";
+import { api, API_BASE, COLD_START_TIMEOUT_MS } from "./client";
 import type {
-  ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, Job, JobResults, Member,
-  Notification, Ready, Repo, TaskType, Tree, User, Visibility,
+  ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, GithubCallbackResult,
+  GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, TaskType,
+  Tree, User, Visibility,
 } from "./types";
 
 // Keys are hierarchical so one invalidate(["repo", id]) refreshes everything under a repository.
@@ -26,6 +27,8 @@ export const qk = {
   jobs: ["jobs"] as const,
   job: (id: string) => ["jobs", id] as const,
   results: (id: string) => ["jobs", id, "results"] as const,
+  githubStatus: ["github", "status"] as const,
+  githubRepos: ["github", "repos"] as const,
 };
 
 // ---------- reads ----------
@@ -146,6 +149,25 @@ export const useJobResults = (id: string, enabled: boolean) =>
     staleTime: Infinity,
   });
 
+/** Whether GitHub is configured on this server and connected for this user. */
+export const useGithubStatus = (enabled = true) =>
+  useQuery({
+    queryKey: qk.githubStatus,
+    queryFn: ({ signal }) => api<GithubStatus>("/github/status", { signal }),
+    enabled,
+    staleTime: 60_000,
+  });
+
+/** The connected account's repositories. Hits the GitHub API, so it is not refetched eagerly. */
+export const useGithubRepos = (enabled: boolean) =>
+  useQuery({
+    queryKey: qk.githubRepos,
+    queryFn: ({ signal }) => api<GithubRepo[]>("/github/repositories", { signal, timeoutMs: 60_000 }),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
 // ---------- writes ----------
 function useInvalidating<TVars, TRes>(fn: (v: TVars) => Promise<TRes>, keys: (v: TVars, r: TRes) => QueryKey[]) {
   const qc = useQueryClient();
@@ -208,6 +230,40 @@ export const useCommitFiles = (id: string) =>
 
 export const useExportRepo = (id: string) =>
   useMutation({ mutationFn: () => api<ExportResult>(`/repositories/${id}/exports`, { method: "POST", timeoutMs: 120_000 }) });
+
+/** Step 1 of the OAuth dance: ask the API where to send the browser. */
+export const useGithubOAuthStart = () =>
+  useMutation({
+    mutationFn: (b: { mode: "signin" | "connect"; next?: string }) =>
+      api<{ authorize_url: string; state: string }>("/github/oauth/start", { method: "POST", body: b }),
+  });
+
+/** Step 2: hand ?code/?state back to the API. Cold starts are slow here, so the budget is generous. */
+export const useGithubOAuthCallback = () =>
+  useMutation({
+    mutationFn: (b: { code: string; state: string }) =>
+      api<GithubCallbackResult>("/github/oauth/callback", {
+        method: "POST",
+        body: b,
+        timeoutMs: COLD_START_TIMEOUT_MS,
+      }),
+  });
+
+export const useDisconnectGithub = () =>
+  useInvalidating(() => api<void>("/github/connection", { method: "DELETE" }), () => [qk.githubStatus, qk.githubRepos]);
+
+/** One repository per call: a clone can take minutes, so the caller loops and shows progress. */
+export const useImportGithubRepo = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (b: { full_name: string; visibility?: Visibility }) =>
+      api<ImportResult>("/github/imports", { method: "POST", body: b, timeoutMs: 300_000 }),
+    onSuccess: () =>
+      Promise.all(
+        [qk.repos, qk.myActivity, qk.githubRepos].map((queryKey) => qc.invalidateQueries({ queryKey })),
+      ),
+  });
+};
 
 export const useUpdateMe = () =>
   useInvalidating((b: { display_name: string }) => api<User>("/users/me", { method: "PATCH", body: b }), () => [qk.me]);

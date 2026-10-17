@@ -21,6 +21,8 @@ type Ctx = {
   /** true once this tab ended the session itself (logout/expiry); it then owns the redirect */
   ended: boolean;
   login: (email: string, password: string) => Promise<User>;
+  /** Start a session from a token the server already issued (GitHub OAuth callback). */
+  adopt: (r: TokenResponse) => User;
   logout: () => Promise<void>;
 };
 
@@ -93,10 +95,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(t);
   }, [session, end]);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      // login is often the first real request, so it may be the one paying the backend's cold start
-      const r = await api<TokenResponse>("/auth/login", { body: { email, password }, timeoutMs: COLD_START_TIMEOUT_MS });
+  // every way of signing in ends here: password login and the GitHub callback share one path
+  const adopt = useCallback(
+    (r: TokenResponse) => {
       const s: Stored = { token: r.access_token, exp: Date.now() + r.expires_in * 1000, user: r.user };
       setAuthToken(s.token);
       write(s);
@@ -107,6 +108,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return r.user;
     },
     [qc],
+  );
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      // login is often the first real request, so it may be the one paying the backend's cold start
+      const r = await api<TokenResponse>("/auth/login", { body: { email, password }, timeoutMs: COLD_START_TIMEOUT_MS });
+      return adopt(r);
+    },
+    [adopt],
   );
 
   const logout = useCallback(async () => {
@@ -126,9 +136,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       expiresAt: session?.exp ?? null,
       ended,
       login,
+      adopt,
       logout,
     }),
-    [status, session, ended, login, logout],
+    [status, session, ended, login, adopt, logout],
   );
 
   return <SessionContext value={value}>{children}</SessionContext>;

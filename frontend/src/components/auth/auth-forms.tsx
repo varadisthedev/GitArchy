@@ -8,6 +8,7 @@ import { COLD_START_TIMEOUT_MS, api, isApiError } from "@/lib/api/client";
 import type { User } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session";
 import { InlineError, Spinner } from "@/components/ui/states";
+import { GithubButton } from "@/components/auth/github-button";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // only same-site absolute paths: never "//evil.com" or "https://…"
@@ -35,6 +36,18 @@ function useSlowRequest(pending: boolean, afterMs = 6_000) {
   }, [pending, afterMs]);
   return slow;
 }
+
+/** "or" rule between the GitHub button and the email form. */
+function Divider() {
+  return (
+    <div className="my-5 flex items-center gap-3" aria-hidden>
+      <span className="h-px flex-1 bg-line" />
+      <span className="text-2xs text-fg-3">or</span>
+      <span className="h-px flex-1 bg-line" />
+    </div>
+  );
+}
+
 
 function WakingNotice() {
   return (
@@ -126,7 +139,11 @@ export function LoginForm({ next, expired, signedOut, registered }: { next?: str
           Create an account
         </Link>
       </p>
-      <form onSubmit={submit} noValidate className="mt-7 space-y-4">
+      <div className="mt-7">
+        <GithubButton mode="signin" next={dest} />
+      </div>
+      <Divider />
+      <form onSubmit={submit} noValidate className="space-y-4">
         <div>
           <label htmlFor="email" className="label">Email</label>
           <input
@@ -219,7 +236,11 @@ export function RegisterForm() {
           Sign in
         </Link>
       </p>
-      <form onSubmit={submit} noValidate className="mt-7 space-y-4">
+      <div className="mt-7">
+        <GithubButton mode="signin" next="/dashboard" label="Sign up with GitHub" />
+      </div>
+      <Divider />
+      <form onSubmit={submit} noValidate className="space-y-4">
         <div>
           <label htmlFor="display_name" className="label">Display name</label>
           <input
