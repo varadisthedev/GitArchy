@@ -1,11 +1,12 @@
 "use client";
 
-import { Bell, UserPlus } from "lucide-react";
+import { Activity, Bell, SearchX, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMyActivity, useNotifications, useRepos } from "@/lib/api/queries";
 import { fullDate, relTime } from "@/lib/format";
 import { ActivityFeed } from "@/components/activity/feed";
+import { CommitActivityChart } from "@/components/activity/commit-chart";
 import { EmptyState, ErrorState, PageHeader, SkeletonRows } from "@/components/ui/states";
 
 const TYPES = [
@@ -28,8 +29,9 @@ export function MyActivity() {
     return (id: string) => m.get(id);
   }, [repos.data]);
 
-  const events = (activity.data ?? []).filter(
-    (e) => (type === "all" || (type === "member" ? e.type.startsWith("member.") : e.type === type)) && (repo === "all" || e.repo_id === repo),
+  const inRepo = (activity.data ?? []).filter((e) => repo === "all" || e.repo_id === repo);
+  const events = inRepo.filter(
+    (e) => type === "all" || (type === "member" ? e.type.startsWith("member.") : e.type === type),
   );
 
   return (
@@ -37,6 +39,11 @@ export function MyActivity() {
       <PageHeader title="Activity" description="What you've done across Gitarchy, and notices addressed to you." />
       <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section aria-labelledby="feed-h" className="min-w-0">
+          {activity.isSuccess && activity.data.length ? (
+            <div className="mb-8 rounded-lg border border-line bg-surface/40 p-4">
+              <CommitActivityChart events={inRepo} capped={activity.data.length === 100} />
+            </div>
+          ) : null}
           <div className="mb-1 flex flex-wrap items-center gap-2 border-b border-line pb-2">
             <h2 id="feed-h" className="mr-auto text-lg font-bold">Your activity</h2>
             <label htmlFor="act-type" className="sr-only">Event type</label>
@@ -52,11 +59,11 @@ export function MyActivity() {
           {activity.isPending ? <SkeletonRows rows={6} label="Loading activity" /> : null}
           {activity.isError ? <ErrorState error={activity.error} retry={() => activity.refetch()} compact /> : null}
           {activity.isSuccess && !activity.data.length ? (
-            <EmptyState art="no-activity" title="No activity yet" compact action={<Link href="/repositories/new" className="btn">Create a repository</Link>}>
+            <EmptyState icon={<Activity />} title="No activity yet" compact action={<Link href="/repositories/new" className="btn">Create a repository</Link>}>
               Creating repositories, committing and branching all show up here.
             </EmptyState>
           ) : null}
-          {activity.isSuccess && activity.data.length > 0 && !events.length ? <EmptyState art="no-matches" title="Nothing matches these filters" compact /> : null}
+          {activity.isSuccess && activity.data.length > 0 && !events.length ? <EmptyState icon={<SearchX />} title="Nothing matches these filters" compact /> : null}
           {events.length ? <ActivityFeed events={events} names={{ repo: name, actor: () => "You" }} /> : null}
           {activity.data?.length === 100 ? <p className="mt-4 text-2xs text-fg-3">Showing your latest 100 events.</p> : null}
         </section>
