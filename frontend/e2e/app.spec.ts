@@ -19,7 +19,9 @@ test.afterAll(async () => {
 });
 
 test("landing page explains the product and links to sign-up", async () => {
+  const wake = page.waitForRequest(`${API}/health`); // every page view pokes /health so a sleeping host starts warming
   await page.goto("/");
+  await wake;
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Host the code.");
   await expect(page.getByText("Sample data", { exact: true }).first()).toBeVisible();
   await page.getByRole("link", { name: "Create an account" }).first().click();

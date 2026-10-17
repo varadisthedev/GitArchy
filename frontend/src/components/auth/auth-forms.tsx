@@ -4,7 +4,7 @@ import { CircleCheck, Eye, EyeOff, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { api, isApiError } from "@/lib/api/client";
+import { COLD_START_TIMEOUT_MS, api, isApiError } from "@/lib/api/client";
 import type { User } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session";
 import { InlineError, Spinner } from "@/components/ui/states";
@@ -21,6 +21,28 @@ const safeNext = (n?: string) => {
     return "/dashboard";
   }
 };
+
+// A cold backend can leave a submit pending for most of a minute. Say so instead of spinning silently.
+function useSlowRequest(pending: boolean, afterMs = 6_000) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) return;
+    const t = window.setTimeout(() => setSlow(true), afterMs);
+    return () => {
+      window.clearTimeout(t);
+      setSlow(false);
+    };
+  }, [pending, afterMs]);
+  return slow;
+}
+
+function WakingNotice() {
+  return (
+    <p role="status" className="hint">
+      Still waiting on the server. It sleeps when unused and can take up to a minute to boot — this stays open until it answers.
+    </p>
+  );
+}
 
 function useRedirectIfAuthed(next: string) {
   const { status } = useSession();
@@ -67,6 +89,7 @@ export function LoginForm({ next, expired, signedOut, registered }: { next?: str
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [serverError, setServerError] = useState<unknown>(null);
   const [pending, setPending] = useState(false);
+  const slow = useSlowRequest(pending);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -130,6 +153,7 @@ export function LoginForm({ next, expired, signedOut, registered }: { next?: str
         <button type="submit" className="btn btn-primary h-9 w-full" disabled={pending}>
           {pending ? <><Spinner /> Signing in…</> : "Sign in"}
         </button>
+        {slow ? <WakingNotice /> : null}
       </form>
       <p className="mt-6 text-2xs text-fg-3">There&apos;s no password reset yet. The server doesn&apos;t offer one.</p>
     </>
@@ -144,6 +168,7 @@ export function RegisterForm() {
   const [errors, setErrors] = useState<Partial<Record<keyof typeof f, string>>>({});
   const [serverError, setServerError] = useState<unknown>(null);
   const [pending, setPending] = useState(false);
+  const slow = useSlowRequest(pending);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
 
   async function submit(e: FormEvent) {
@@ -163,7 +188,7 @@ export function RegisterForm() {
     if (Object.keys(errs).length) return;
     setPending(true);
     try {
-      await api<User>("/auth/register", { body: { display_name: name, email: f.email.trim(), password: f.password } });
+      await api<User>("/auth/register", { body: { display_name: name, email: f.email.trim(), password: f.password }, timeoutMs: COLD_START_TIMEOUT_MS });
     } catch (err) {
       if (isApiError(err) && err.status === 422) {
         setErrors({
@@ -235,6 +260,7 @@ export function RegisterForm() {
         <button type="submit" className="btn btn-primary h-9 w-full" disabled={pending}>
           {pending ? <><Spinner /> Creating account…</> : "Create account"}
         </button>
+        {slow ? <WakingNotice /> : null}
       </form>
     </>
   );

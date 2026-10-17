@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, setAuthToken, setUnauthorizedHandler } from "@/lib/api/client";
+import { COLD_START_TIMEOUT_MS, api, setAuthToken, setUnauthorizedHandler } from "@/lib/api/client";
 import { qk } from "@/lib/api/queries";
 import type { TokenResponse, User } from "@/lib/api/types";
 
@@ -95,7 +95,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const r = await api<TokenResponse>("/auth/login", { body: { email, password } });
+      // login is often the first real request, so it may be the one paying the backend's cold start
+      const r = await api<TokenResponse>("/auth/login", { body: { email, password }, timeoutMs: COLD_START_TIMEOUT_MS });
       const s: Stored = { token: r.access_token, exp: Date.now() + r.expires_in * 1000, user: r.user };
       setAuthToken(s.token);
       write(s);

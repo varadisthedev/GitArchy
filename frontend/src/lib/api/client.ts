@@ -3,6 +3,19 @@
 
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
 export const API_V1 = `${API_BASE}/api/v1`;
+export const API_HOST = (() => {
+  try {
+    return new URL(API_BASE).host;
+  } catch {
+    return API_BASE;
+  }
+})();
+
+/** Default per-request budget. */
+export const TIMEOUT_MS = 30_000;
+/** Budget for a request that may be the one paying the backend's cold start (Render free tier boots in ~50s).
+ *  Raise this if sign-in still times out on a cold server. */
+export const COLD_START_TIMEOUT_MS = 90_000;
 
 export class ApiError extends Error {
   constructor(
@@ -58,7 +71,7 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(opts.body);
   }
-  const timeout = AbortSignal.timeout(opts.timeoutMs ?? 30_000);
+  const timeout = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
   let res: Response;
@@ -66,8 +79,20 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
     res = await fetch(url, { method: opts.method ?? (body ? "POST" : "GET"), headers, body, signal });
   } catch (e) {
     if (opts.signal?.aborted) throw e; // caller cancelled; let react-query drop it
-    if (timeout.aborted) throw new ApiError(0, "timeout", "The server took too long to respond. Try again.");
-    throw new ApiError(0, "network_error", "Can't reach the Gitarchy API. Check your connection or try again shortly.");
+    const secs = Math.round((opts.timeoutMs ?? TIMEOUT_MS) / 1000);
+    if (timeout.aborted)
+      throw new ApiError(
+        0,
+        "timeout",
+        `The Gitarchy API at ${API_HOST} accepted the request but didn't answer within ${secs}s. It's most likely still waking up from idle — free hosting shuts the server down after ~15 minutes and a cold start takes up to a minute. Try again; the next attempt is usually fast.`,
+      );
+    throw new ApiError(
+      0,
+      "network_error",
+      typeof navigator !== "undefined" && !navigator.onLine
+        ? "You're offline. Reconnect and try again — nothing was sent."
+        : `Couldn't reach the Gitarchy API at ${API_HOST}. The backend may be asleep, restarting or down, or something between you and it (a firewall, VPN or ad blocker) refused the request. Wait ~30 seconds and try again; if it keeps failing, the server is probably down.`,
+    );
   }
 
   if (res.status === 204) return undefined as T;
@@ -114,7 +139,10 @@ function humanize(status: number, code?: string, message?: string): string {
   if (status === 429) return "Too many requests. Wait a moment and try again.";
   if (status === 403) return message || "You don't have permission to do that.";
   if (status === 404) return message || "Not found.";
-  if (status >= 500) return "The server hit an error. Try again in a moment.";
+  if (status === 502 || status === 504)
+    return `The Gitarchy API at ${API_HOST} is starting up or restarting and isn't serving requests yet. Wait ~30 seconds and try again.`;
+  if (status === 503) return message || "The server is temporarily unavailable — it may be restarting or overloaded. Try again in a moment.";
+  if (status >= 500) return "The server reached your request but hit an internal error. Nothing was saved. Try again in a moment.";
   return message || "Something went wrong.";
 }
 
