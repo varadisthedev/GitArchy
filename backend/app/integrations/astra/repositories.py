@@ -136,6 +136,7 @@ class AstraStore:
         """Claim the GitHub account for this user, then store the token. Re-connecting the same
         account by the same user is idempotent; another user's account raises Conflict."""
         uid, gid = _u(user_id), int(ident["github_id"])
+        previous = await self.get_github_identity(user_id)
         ok, row = await self._applied(
             "INSERT INTO users_by_github_id (github_id, user_id) VALUES (?, ?) IF NOT EXISTS", (gid, uid))
         if not ok and str(row.get("user_id")) != str(uid):
@@ -152,6 +153,11 @@ class AstraStore:
             "avatar_url, connected_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (uid, gid, ident["login"], ident["access_token"], ident.get("scope", ""),
              ident.get("avatar_url"), ident.get("connected_at") or utcnow()))
+        if previous and int(previous["github_id"]) != gid:
+            # the user switched GitHub accounts: release the old claim, or it would keep signing in
+            # as this user and keep anyone else from ever linking that account
+            await self._x("DELETE FROM users_by_github_id WHERE github_id = ? IF user_id = ?",
+                          (int(previous["github_id"]), uid))
 
     async def get_github_identity(self, user_id: str) -> dict | None:
         rows = await self._x("SELECT * FROM github_identity_by_user WHERE user_id = ?", (_u(user_id),))
@@ -159,7 +165,14 @@ class AstraStore:
 
     async def get_user_by_github_id(self, github_id: int) -> dict | None:
         rows = await self._x("SELECT user_id FROM users_by_github_id WHERE github_id = ?", (int(github_id),))
-        return await self.get_user(str(rows[0]["user_id"])) if rows else None  # orphan claim -> None
+        if not rows:
+            return None
+        uid = str(rows[0]["user_id"])
+        # the claim must still be the one the user holds, so a stale claim can never authenticate
+        ident = await self.get_github_identity(uid)
+        if not ident or int(ident["github_id"]) != int(github_id):
+            return None
+        return await self.get_user(uid)  # orphan claim -> None
 
     async def clear_github_identity(self, user_id: str) -> None:
         ident = await self.get_github_identity(user_id)

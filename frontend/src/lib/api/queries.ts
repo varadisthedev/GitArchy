@@ -231,17 +231,43 @@ export const useCommitFiles = (id: string) =>
 export const useExportRepo = (id: string) =>
   useMutation({ mutationFn: () => api<ExportResult>(`/repositories/${id}/exports`, { method: "POST", timeoutMs: 120_000 }) });
 
-/** Step 1 of the OAuth dance: ask the API where to send the browser. */
+// The nonce proves the callback runs in the browser that started the flow. sessionStorage is
+// per-tab and survives the trip out to GitHub and back, and it is never sent anywhere but our API.
+const NONCE_KEY = "gitarchy.github.oauth.nonce";
+
+export function takeOAuthNonce(): string {
+  try {
+    const n = sessionStorage.getItem(NONCE_KEY) ?? "";
+    sessionStorage.removeItem(NONCE_KEY); // single use on this side too
+    return n;
+  } catch {
+    return "";
+  }
+}
+
+/** Step 1 of the OAuth dance: ask the API where to send the browser, and keep the nonce it returns. */
 export const useGithubOAuthStart = () =>
   useMutation({
-    mutationFn: (b: { mode: "signin" | "connect"; next?: string }) =>
-      api<{ authorize_url: string; state: string }>("/github/oauth/start", { method: "POST", body: b }),
+    mutationFn: async (b: { mode: "signin" | "connect"; next?: string }) => {
+      const r = await api<{ authorize_url: string; state: string; nonce: string }>("/github/oauth/start", {
+        method: "POST",
+        body: b,
+      });
+      try {
+        sessionStorage.setItem(NONCE_KEY, r.nonce);
+      } catch {
+        // private mode with storage blocked: the callback will fail closed rather than silently
+        // accepting an unbound state, so surface it now instead of after the round trip
+        throw new Error("Browser storage is blocked, so GitHub sign-in can't be completed securely.");
+      }
+      return r;
+    },
   });
 
-/** Step 2: hand ?code/?state back to the API. Cold starts are slow here, so the budget is generous. */
+/** Step 2: hand ?code/?state plus the stored nonce back to the API. Cold starts are slow here. */
 export const useGithubOAuthCallback = () =>
   useMutation({
-    mutationFn: (b: { code: string; state: string }) =>
+    mutationFn: (b: { code: string; state: string; nonce: string }) =>
       api<GithubCallbackResult>("/github/oauth/callback", {
         method: "POST",
         body: b,

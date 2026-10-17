@@ -76,6 +76,10 @@ class MemoryStore:
             if owner and owner != user_id:
                 raise Conflict("That GitHub account is already linked to another Gitarchey user",
                                code="github_already_linked")
+            previous = self.github.get(user_id)
+            if previous and int(previous["github_id"]) != gid:
+                # switching accounts must release the old claim (see AstraStore.set_github_identity)
+                self.github_ids.pop(int(previous["github_id"]), None)
             self.github_ids[gid] = user_id
             self.github[user_id] = {**ident, "user_id": user_id, "github_id": gid,
                                     "scope": ident.get("scope", ""),
@@ -87,7 +91,12 @@ class MemoryStore:
 
     async def get_user_by_github_id(self, github_id: int) -> dict | None:
         uid = self.github_ids.get(int(github_id))
-        return await self.get_user(uid) if uid else None
+        if not uid:
+            return None
+        ident = self.github.get(uid)
+        if not ident or int(ident["github_id"]) != int(github_id):
+            return None
+        return await self.get_user(uid)
 
     async def clear_github_identity(self, user_id: str) -> None:
         async with self._lock:

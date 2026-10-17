@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { isApiError } from "@/lib/api/client";
-import { useGithubOAuthCallback } from "@/lib/api/queries";
+import { takeOAuthNonce, useGithubOAuthCallback } from "@/lib/api/queries";
 import { useSession } from "@/lib/auth/session";
 import { Spinner } from "@/components/ui/states";
 
@@ -44,7 +44,7 @@ export function GithubCallback() {
     if (urlProblem || started.current) return;
     started.current = true;
     exchange
-      .mutateAsync({ code: code!, state: state! })
+      .mutateAsync({ code: code!, state: state!, nonce: takeOAuthNonce() })
       .then((r) => {
         const next = safeNext(r.next);
         if (r.mode === "signin" && r.token) {

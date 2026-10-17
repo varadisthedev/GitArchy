@@ -169,10 +169,87 @@ async def test_oauth_only_account_cannot_password_login(ctx):
 async def test_connect_state_is_bound_to_the_session_that_started_it(ctx):
     from app.core.exceptions import Forbidden
     alice = await _user(ctx, "alice@example.com")
-    state = create_oauth_state(ctx.settings, mode="connect", uid=alice.id, next=None)
+    started = service.start(ctx, "connect", None, alice.id)
     # a different signed-in user replaying Alice's state cannot attach her GitHub account
     with pytest.raises(Forbidden):
-        await service.callback(ctx, "code", state, caller_id=str(uuid.uuid4()))
+        await service.callback(ctx, "code", started["state"], started["nonce"],
+                               caller_id=str(uuid.uuid4()))
+
+
+async def test_state_must_come_from_the_browser_that_started_it(ctx):
+    """Login CSRF: a signed state alone must not be enough to drive someone else's browser."""
+    from app.core.exceptions import Unauthorized
+    started = service.start(ctx, "signin", None, None)
+    other = service.start(ctx, "signin", None, None)
+    # the attacker's state paired with this browser's nonce (or none at all) is refused
+    for bad_nonce in ("", "guessed", other["nonce"]):
+        with pytest.raises(Unauthorized) as e:
+            await service.callback(ctx, "code", started["state"], bad_nonce, caller_id=None)
+        assert e.value.code == "oauth_state_invalid"
+    # a state with no nonce hash at all (an older or hand-rolled one) is refused too
+    legacy = create_oauth_state(ctx.settings, mode="signin", uid=None, next=None)
+    with pytest.raises(Unauthorized):
+        await service.callback(ctx, "code", legacy, "anything", caller_id=None)
+
+
+async def test_state_is_single_use(ctx, monkeypatch):
+    """A replayed state must fail even while its signature is still inside the expiry window."""
+    monkeypatch.setattr(service.client, "exchange_code",
+                        lambda s, c: {"access_token": "gho_x", "scope": "repo"})
+    monkeypatch.setattr(service.client, "get_viewer", lambda s, t: {
+        "github_id": 777, "login": "newbie", "name": "New Bie", "avatar_url": None, "email": None})
+    monkeypatch.setattr(service.client, "get_verified_email", lambda s, t: None)
+    started = service.start(ctx, "signin", None, None)
+    first = await service.callback(ctx, "code", started["state"], started["nonce"], caller_id=None)
+    assert first["mode"] == "signin" and first["token"].access_token
+
+    from app.core.exceptions import Unauthorized
+    with pytest.raises(Unauthorized) as e:
+        await service.callback(ctx, "code", started["state"], started["nonce"], caller_id=None)
+    assert e.value.code == "oauth_state_invalid"
+
+
+async def test_github_signin_never_adopts_an_existing_email_account(ctx, monkeypatch):
+    """Pre-hijack: Gitarchey never verifies registration emails, so a matching address must not
+    hand the GitHub user someone else's account."""
+    from app.core.exceptions import Conflict
+    from app.core.security import hash_password
+    victim_email = "victim@example.com"
+    attacker = {"id": str(uuid.uuid4()), "email": victim_email, "display_name": "Squatter",
+                "password_hash": hash_password("attacker-knows-this"), "avatar_url": None,
+                "avatar_public_id": None, "created_at": utcnow()}
+    await ctx.store.create_user(attacker)
+
+    monkeypatch.setattr(service.client, "exchange_code",
+                        lambda s, c: {"access_token": "gho_x", "scope": "repo"})
+    monkeypatch.setattr(service.client, "get_viewer", lambda s, t: {
+        "github_id": 555, "login": "victim", "name": "Victim", "avatar_url": None,
+        "email": victim_email})
+    monkeypatch.setattr(service.client, "get_verified_email", lambda s, t: victim_email)
+
+    started = service.start(ctx, "signin", None, None)
+    with pytest.raises(Conflict) as e:
+        await service.callback(ctx, "code", started["state"], started["nonce"], caller_id=None)
+    assert e.value.code == "github_email_taken"
+    # and no session was handed out for the squatted account
+    assert await ctx.store.get_user_by_github_id(555) is None
+
+
+async def test_switching_github_accounts_releases_the_old_claim(ctx):
+    """A stale claim would keep signing in as this user and block anyone else from linking it."""
+    user = await _user(ctx, "switcher@example.com", github_id=1001)
+    assert (await ctx.store.get_user_by_github_id(1001))["id"] == user.id
+
+    await ctx.store.set_github_identity(user.id, {
+        "github_id": 2002, "login": "newlogin", "access_token": "gho_2", "scope": "repo"})
+    assert (await ctx.store.get_user_by_github_id(2002))["id"] == user.id
+    assert await ctx.store.get_user_by_github_id(1001) is None  # old claim released
+
+    # the freed account can now be linked by somebody else
+    other = await _user(ctx, "other@example.com", github_id=3003)
+    await ctx.store.set_github_identity(other.id, {
+        "github_id": 1001, "login": "oldlogin", "access_token": "gho_3", "scope": "repo"})
+    assert (await ctx.store.get_user_by_github_id(1001))["id"] == other.id
 
 
 def test_local_name_mapping():

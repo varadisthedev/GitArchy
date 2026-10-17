@@ -28,6 +28,8 @@ class GithubCallback(BaseModel):
     model_config = ConfigDict(extra="forbid")
     code: str = Field(min_length=1, max_length=512)
     state: str = Field(min_length=1, max_length=4096)
+    # proves the flow started in this browser; the state holds only its hash
+    nonce: str = Field(min_length=1, max_length=256)
 
 
 class GithubStatus(BaseModel):

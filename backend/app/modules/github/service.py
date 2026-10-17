@@ -9,12 +9,16 @@ progress is visible without an import-jobs table, a background worker, or pollin
 either lands completely or not at all. See docs for the trade-off this accepts.
 """
 import asyncio
+import hashlib
 import logging
+import secrets
+import time
 import uuid
 
 from app.api.dependencies import AuthUser, Context
-from app.core.exceptions import Conflict, Forbidden, Unavailable
-from app.core.security import create_access_token, create_oauth_state, decode_oauth_state
+from app.core.exceptions import Conflict, Forbidden, Unauthorized, Unavailable
+from app.core.security import (create_access_token, create_oauth_state, decode_oauth_state,
+                               secrets_equal)
 from app.integrations.astra.memory import utcnow
 from app.integrations.github import client
 from app.modules.auth.schemas import TokenResponse
@@ -33,23 +37,47 @@ def _enabled(ctx: Context) -> None:
 
 
 # ---------------------------------------------------------------- oauth
+def _nonce_hash(nonce: str) -> str:
+    return hashlib.sha256(nonce.encode()).hexdigest()
+
+
 def start(ctx: Context, mode: str, next_: str | None, user_id: str | None) -> dict:
-    """Build the GitHub authorize URL. `mode` is 'signin' (anonymous) or 'connect' (bound to user_id)."""
+    """Build the GitHub authorize URL. `mode` is 'signin' (anonymous) or 'connect' (bound to user_id).
+
+    The returned nonce binds the flow to the browser that started it: the caller keeps it in
+    sessionStorage and must send it back, while the state carries only its hash. Without this a
+    signed state is bearer-shaped, and an attacker who completed their own GitHub authorization
+    could feed their code+state to someone else's browser and sign them into the attacker's
+    account. A cookie would do the same job, but this API is deliberately cookie-free
+    (CORS runs with credentials disabled), so the nonce rides in the request body instead.
+    """
     _enabled(ctx)
     if mode == "connect" and not user_id:
         raise Forbidden("Sign in before connecting a GitHub account")
-    state = create_oauth_state(ctx.settings, mode=mode, uid=user_id, next=next_ or None)
+    nonce = secrets.token_urlsafe(32)
+    state = create_oauth_state(ctx.settings, mode=mode, uid=user_id, next=next_ or None,
+                               nh=_nonce_hash(nonce))
     return {"authorize_url": client.authorize_url(ctx.settings, state, ctx.settings.github_scopes),
-            "state": state}
+            "state": state, "nonce": nonce}
 
 
-async def callback(ctx: Context, code: str, state: str, caller_id: str | None) -> dict:
+async def callback(ctx: Context, code: str, state: str, nonce: str, caller_id: str | None) -> dict:
     """Finish the flow. Returns {"mode": "signin", "token": TokenResponse} or {"mode": "connect", ...}."""
     _enabled(ctx)
     claims = decode_oauth_state(ctx.settings, state)
     mode = claims.get("mode")
     if mode not in ("signin", "connect"):
         raise InvalidInput("Unsupported OAuth flow", code="oauth_state_invalid")
+    if not claims.get("nh") or not secrets_equal(_nonce_hash(nonce), str(claims["nh"])):
+        raise Unauthorized("This sign-in didn't start in this browser. Start again.",
+                           code="oauth_state_invalid")
+    # single use: the revoked-token table already stores short-lived jti entries with a TTL, so a
+    # replayed state is rejected even while its signature is still inside the expiry window
+    jti = str(claims.get("jti") or "")
+    if not jti or await ctx.store.is_token_revoked(jti):
+        raise Unauthorized("This sign-in link was already used. Start again.",
+                           code="oauth_state_invalid")
+    await ctx.store.revoke_token(jti, max(int(claims["exp"] - time.time()) + 1, 1))
     if mode == "connect":
         # the state is bound to the user who started it; a token swapped in afterwards cannot redirect it
         if not claims.get("uid") or claims["uid"] != caller_id:
@@ -75,18 +103,25 @@ async def callback(ctx: Context, code: str, state: str, caller_id: str | None) -
 
 
 async def _find_or_create_user(ctx: Context, viewer: dict, token: str) -> dict:
-    """Existing link wins; then a *verified* email match; otherwise a new account."""
+    """An existing link wins; otherwise a new account. Email never adopts an existing account.
+
+    Matching on email would be a pre-hijack: Gitarchey does not verify the addresses given at
+    registration, so anyone can register victim@example.com and wait. The victim's GitHub sign-in
+    would then drop them into an account the attacker still holds the password for. Verifying
+    GitHub's side is not enough, because the local side is the unverified one. So a taken address is
+    refused here and the user links GitHub from a signed-in session instead, which proves they hold
+    the local account.
+    """
     existing = await ctx.store.get_user_by_github_id(viewer["github_id"])
     if existing:
         return existing
 
     email = await asyncio.to_thread(client.get_verified_email, ctx.settings, token)
     if email:
-        by_email = await ctx.store.get_user_by_email(email)
-        if by_email:
-            # Only a verified GitHub address may adopt an existing account. An unverified one would let
-            # anyone who can set that address in GitHub take over a password account.
-            return by_email
+        if await ctx.store.get_user_by_email(email):
+            raise Conflict(
+                "A Gitarchey account already uses this email address. Sign in with your password, "
+                "then connect GitHub from Settings to link the two.", code="github_email_taken")
     else:
         # user:email was declined, or no address is verified: never guess, use GitHub's noreply form
         email = f"{viewer['github_id']}+{viewer['login']}@users.noreply.github.com"

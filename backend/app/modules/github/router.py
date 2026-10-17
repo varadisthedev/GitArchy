@@ -33,7 +33,8 @@ async def oauth_start(body: GithubStart, auth: AuthUser | None = Depends(_option
 @router.post("/oauth/callback", dependencies=[Depends(limit_ip("github_oauth"))])
 async def oauth_callback(body: GithubCallback, auth: AuthUser | None = Depends(_optional_user),
                          ctx: Context = Depends(get_ctx)):
-    result = await service.callback(ctx, body.code, body.state, auth.id if auth else None)
+    result = await service.callback(ctx, body.code, body.state, body.nonce,
+                                   auth.id if auth else None)
     token: TokenResponse | None = result.get("token")
     return {"mode": result["mode"], "login": result.get("login"), "next": result.get("next"),
             "token": token.model_dump() if token else None}
