@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { isApiError } from "@/lib/api/client";
 import { BackendWake } from "@/lib/api/wake";
 import { SessionProvider } from "@/lib/auth/session";
@@ -23,7 +23,9 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <QueryClientProvider client={client}>
-      <BackendWake />
+      <Suspense fallback={null}>
+        <BackendWake />
+      </Suspense>
       <SessionProvider>
         <Toaster>{children}</Toaster>
       </SessionProvider>

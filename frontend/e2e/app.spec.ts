@@ -140,6 +140,22 @@ test("create a branch and compare it", async () => {
   await expect(page.getByText("REFUNDS.md").first()).toBeVisible();
 });
 
+test("activity page charts commits by month, zero-filling quiet months", async () => {
+  await page.goto("/activity");
+  const chart = page.getByRole("figure").filter({ hasText: "Commits by month" });
+  await expect(chart).toBeVisible();
+  // three commits were made above (the repo's initial commit is a repo.created event, not a commit)
+  await expect(chart).toContainText("3 commits over the last 12 months");
+
+  await chart.getByRole("button", { name: "Table" }).click();
+  const rows = chart.locator("tbody tr");
+  await expect(rows).toHaveCount(12); // a continuous 12-month range, not just months with data
+  const thisMonth = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date());
+  await expect(rows.filter({ hasText: thisMonth }).locator("td").nth(1)).toHaveText("3");
+  // every other month is present and explicitly zero
+  await expect(chart.locator("tbody td", { hasText: /^0$/ })).toHaveCount(11);
+});
+
 test("branch picker switches the code view", async () => {
   await page.goto(repoUrl);
   await page.getByRole("button", { name: /Switch branch: main/ }).click();
