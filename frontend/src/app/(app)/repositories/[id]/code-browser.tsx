@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, FilePlus2, Upload } from "lucide-react";
+import { BookOpen, FileCode2, FilePlus2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRepo, useTree, useFile } from "@/lib/api/queries";
@@ -55,7 +55,7 @@ export function CodeBrowser({ id, refParam, path }: { id: string; refParam?: str
         {tree.isError ? <ErrorState error={tree.error} retry={() => tree.refetch()} compact /> : null}
         {tree.isSuccess && !tree.data.entries.length ? (
           <EmptyState
-            art="empty-repo"
+            icon={<FileCode2 />}
             title={path ? "This folder is empty" : "This branch has no files"}
             compact
             action={

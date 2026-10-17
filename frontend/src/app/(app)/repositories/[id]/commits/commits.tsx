@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, GitCompareArrows, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, GitCommitHorizontal, GitCompareArrows, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { COMMIT_PAGE, useCommits, useRepo } from "@/lib/api/queries";
@@ -42,7 +42,7 @@ export function Commits({ id, refParam, path, page }: { id: string; refParam?: s
       {commits.isPending || !ref ? <SkeletonRows rows={8} label="Loading commits" /> : null}
       {commits.isError ? <ErrorState error={commits.error} retry={() => commits.refetch()} /> : null}
       {commits.isSuccess && !list.length ? (
-        <EmptyState art="no-commits" title={page ? "No older commits" : "No commits"}>
+        <EmptyState icon={<GitCommitHorizontal />} title={page ? "No older commits" : "No commits"}>
           {path ? "No commit on this branch touches that path." : "This branch has no history."}
         </EmptyState>
       ) : null}

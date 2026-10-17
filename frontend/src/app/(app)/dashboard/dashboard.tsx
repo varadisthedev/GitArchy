@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BookPlus, ChartNoAxesColumn } from "lucide-react";
+import { Activity, ArrowRight, BookMarked, BookPlus, ChartNoAxesColumn } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useJobs, useMe, useMyActivity, useRepos } from "@/lib/api/queries";
@@ -63,7 +63,7 @@ export function Dashboard() {
             {repos.isError ? <ErrorState error={repos.error} retry={() => repos.refetch()} compact /> : null}
             {repos.isSuccess && !sorted.length ? (
               <EmptyState
-                art="no-repos"
+                icon={<BookMarked />}
                 title="Start with a repository"
                 action={
                   <Link href="/repositories/new" className="btn btn-primary">
@@ -91,7 +91,7 @@ export function Dashboard() {
             {activity.isPending ? <SkeletonRows rows={5} label="Loading activity" /> : null}
             {activity.isError ? <ErrorState error={activity.error} retry={() => activity.refetch()} compact /> : null}
             {activity.isSuccess && !activity.data.length ? (
-              <EmptyState art="no-activity" title="Nothing yet" compact>
+              <EmptyState icon={<Activity />} title="Nothing yet" compact>
                 Commits, branches and repository changes you make show up here, newest first.
               </EmptyState>
             ) : null}

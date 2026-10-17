@@ -1,7 +1,6 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
-import Image from "next/image";
+import { FileQuestion, Lock, LogOut, ServerCrash, TriangleAlert, WifiOff } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { isApiError } from "@/lib/api/client";
@@ -25,25 +24,14 @@ export function SkeletonRows({ rows = 6, label = "Loading" }: { rows?: number; l
   );
 }
 
-// unDraw illustrations (undraw.co/license), recolored to the stone palette; files live in /public/illustrations.
-export type Art =
-  | "no-repos" | "empty-repo" | "no-commits" | "not-found" | "server-error" | "offline" | "no-jobs"
-  | "no-activity" | "no-matches" | "no-access" | "signed-out" | "error";
-
-export function Illustration({ art, className = "h-36" }: { art: Art; className?: string }) {
-  return <Image src={`/illustrations/${art}.svg`} alt="" aria-hidden width={240} height={160} className={`w-auto max-w-full ${className}`} />;
-}
-
 export function EmptyState({
   icon,
-  art,
   title,
   children,
   action,
   compact = false,
 }: {
   icon?: ReactNode;
-  art?: Art;
   title: string;
   children?: ReactNode;
   action?: ReactNode;
@@ -51,10 +39,13 @@ export function EmptyState({
 }) {
   return (
     <div className={`flex flex-col items-start ${compact ? "px-4 py-6" : "px-6 py-10"}`}>
-      {art ? (
-        <Illustration art={art} className={`mb-5 ${compact ? "h-24" : "h-36"}`} />
-      ) : icon ? (
-        <div className="mb-3 text-fg-3 [&_svg]:size-5">{icon}</div>
+      {icon ? (
+        <div
+          aria-hidden
+          className="mb-3 grid size-9 place-items-center rounded-md border border-line bg-surface text-fg-3 [&_svg]:size-[1.125rem]"
+        >
+          {icon}
+        </div>
       ) : null}
       <h3 className="text-base font-bold">{title}</h3>
       {children ? <div className="mt-1 max-w-[56ch] text-sm text-fg-2">{children}</div> : null}
@@ -66,7 +57,7 @@ export function EmptyState({
 /** Maps a failed request to an explanation and a recovery path. */
 export function ErrorState({ error, retry, compact }: { error: unknown; retry?: () => void; compact?: boolean }) {
   const e = isApiError(error) ? error : null;
-  let art: Art = "error";
+  let icon: ReactNode = <TriangleAlert />;
   let title = "Something went wrong";
   let body: ReactNode = e?.message ?? "An unexpected error occurred.";
   let action: ReactNode = retry ? (
@@ -76,10 +67,10 @@ export function ErrorState({ error, retry, compact }: { error: unknown; retry?: 
   ) : null;
 
   if (e?.status === 0) {
-    art = "offline";
+    icon = <WifiOff />;
     title = "Can't reach the server";
   } else if (e?.status === 404) {
-    art = "not-found";
+    icon = <FileQuestion />;
     title = "Not found";
     body = e.code === "not_found" || e.code === "http_error"
       ? "It doesn't exist, or it's private and you're not a member."
@@ -90,23 +81,23 @@ export function ErrorState({ error, retry, compact }: { error: unknown; retry?: 
       </Link>
     );
   } else if (e?.status === 403) {
-    art = "no-access";
+    icon = <Lock />;
     title = "You don't have access";
   } else if (e?.status === 401) {
-    art = "signed-out";
+    icon = <LogOut />;
     title = "Session ended";
     body = "Sign in again to continue.";
   } else if (e?.code === "repo_storage_unavailable") {
-    art = "server-error";
+    icon = <ServerCrash />;
     title = "Repository storage unavailable";
   } else if (e?.status === 503) {
-    art = "server-error";
+    icon = <ServerCrash />;
     title = "Unavailable on this server";
   }
 
   return (
     <div role="alert">
-      <EmptyState art={art} title={title} action={action} compact={compact}>
+      <EmptyState icon={icon} title={title} action={action} compact={compact}>
         {body}
         {e?.requestId && e.status >= 500 ? (
           <p className="mt-2 font-mono text-2xs text-fg-3">request {e.requestId}</p>

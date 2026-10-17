@@ -1,6 +1,6 @@
 "use client";
 
-import { BookPlus, Search } from "lucide-react";
+import { BookMarked, BookPlus, Search, SearchX } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
@@ -99,7 +99,7 @@ export function Repositories({ initialQ }: { initialQ: string }) {
       {repos.isError ? <ErrorState error={repos.error} retry={() => repos.refetch()} /> : null}
       {repos.isSuccess && !repos.data.length ? (
         <EmptyState
-          art="no-repos"
+          icon={<BookMarked />}
           title="No repositories yet"
           action={
             <Link href="/repositories/new" className="btn btn-primary">
@@ -112,7 +112,7 @@ export function Repositories({ initialQ }: { initialQ: string }) {
         </EmptyState>
       ) : null}
       {repos.isSuccess && repos.data.length > 0 && !list.length ? (
-        <EmptyState art="no-matches" title="No matches" action={<button className="btn" onClick={reset}>Clear filters</button>}>
+        <EmptyState icon={<SearchX />} title="No matches" action={<button className="btn" onClick={reset}>Clear filters</button>}>
           Nothing matches those filters.
         </EmptyState>
       ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { FlaskConical } from "lucide-react";
 import { useMemo } from "react";
 import { isApiError } from "@/lib/api/client";
 import { useJobs, useRepos } from "@/lib/api/queries";
@@ -36,7 +37,7 @@ export function Analytics({ repoId }: { repoId?: string }) {
           {jobs.isError && !disabled ? <ErrorState error={jobs.error} retry={() => jobs.refetch()} compact /> : null}
           {disabled ? <p className="py-4 text-sm text-fg-2">Analytics is turned off on this server.</p> : null}
           {jobs.isSuccess && !list?.length ? (
-            <EmptyState art="no-jobs" title="No jobs yet" compact>
+            <EmptyState icon={<FlaskConical />} title="No jobs yet" compact>
               {repoId ? "Run one above. Its result will be linked here." : "Pick an operation above. Commit activity by day is a good first run."}
             </EmptyState>
           ) : null}

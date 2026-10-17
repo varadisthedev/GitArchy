@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUp, GitBranch, GitBranchPlus, Pencil, Upload, X } from "lucide-react";
+import { FileUp, GitBranch, GitBranchPlus, Lock, Pencil, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -84,7 +84,7 @@ export function EditFile({ id, refParam, path, dir, mode }: { id: string; refPar
   if (!repo.data) return <Skeleton className="h-96" />;
   if (!atLeast(repo.data.role, "writer"))
     return (
-      <EmptyState art="no-access" title="Read-only access" action={<Link className="btn" href={blobHref(id, branch, path)}>View file</Link>}>
+      <EmptyState icon={<Lock />} title="Read-only access" action={<Link className="btn" href={blobHref(id, branch, path)}>View file</Link>}>
         You&apos;re a reader on this repository. Ask an admin for writer access to edit files.
       </EmptyState>
     );

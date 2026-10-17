@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, FolderTree } from "lucide-react";
+import { ArrowLeft, FileQuestion, FolderTree } from "lucide-react";
 import Link from "next/link";
 import { useCommit, useDiff, useRepo } from "@/lib/api/queries";
 import { fullDate, relTime, shortSha } from "@/lib/format";
@@ -18,7 +18,7 @@ export function CommitDetail({ id, sha }: { id: string; sha: string }) {
   const diff = useDiff(id, parent, commit?.sha);
 
   if (c.isError) return <ErrorState error={c.error} retry={() => c.refetch()} />;
-  if (c.isSuccess && !commit) return <EmptyState art="not-found" title="Commit not found">No commit with that SHA exists in this repository.</EmptyState>;
+  if (c.isSuccess && !commit) return <EmptyState icon={<FileQuestion />} title="Commit not found">No commit with that SHA exists in this repository.</EmptyState>;
 
   return (
     <div className="space-y-6">
