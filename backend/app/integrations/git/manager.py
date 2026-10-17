@@ -70,14 +70,15 @@ class GitManager:
         return r.out.decode(errors="replace").strip()
 
     def _run_sync(self, repo_id: str | None, args: list[str], input: bytes | None = None,
-                  env: dict | None = None) -> Result:
+                  env: dict | None = None, timeout: float | None = None) -> Result:
         argv = [self.cfg.git_executable]
         if repo_id is not None:
             argv.append(f"--git-dir={self.storage.path_for(repo_id)}")
         argv += args
         full_env = {**self._base_env, **(env or {})}
         try:
-            p = subprocess.run(argv, input=input, capture_output=True, timeout=self.cfg.git_timeout_s,
+            p = subprocess.run(argv, input=input, capture_output=True,
+                               timeout=timeout or self.cfg.git_timeout_s,
                                env=full_env, shell=False, cwd=tempfile.gettempdir())
         except subprocess.TimeoutExpired:
             log.warning("git_failure", extra={"category": "timeout", "op": args[0]})
@@ -130,6 +131,38 @@ class GitManager:
             raise self._fail("init", r)
         return await self.commit_files(repo_id, default_branch, [("README.md", readme)],
                                        "Initial commit", author_name, author_email, allow_root=True)
+
+    async def clone_bare(self, repo_id: str, clone_url: str, token: str | None = None) -> str:
+        """Mirror a remote's history into this repo's storage. Returns the cloned HEAD branch name.
+
+        The credential travels in the environment (GIT_CONFIG_* -> http.extraHeader), never in argv,
+        so the token is not exposed in the process list. Nothing from the remote is checked out or
+        executed: a bare clone runs no hooks and `--template=` keeps the samples out too.
+
+        `clone_url` must already be vetted by the caller: this wrapper hands it to git as-is, so the
+        transport allow-list lives where the URL enters the system (modules.github.service).
+        """
+        path = self.storage.path_for(repo_id)
+        if path.exists():
+            raise Conflict("Repository storage already exists")
+        env = {}
+        if token:
+            basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+            env = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "http.extraHeader",
+                   "GIT_CONFIG_VALUE_0": f"Authorization: Basic {basic}"}
+        r = await self._run(None, ["clone", "--bare", "--quiet", "--template=",
+                                   "--end-of-options", clone_url, str(path)],
+                            env=env, timeout=self.cfg.github_clone_timeout_s)
+        if r.rc != 0:
+            self.storage.remove(repo_id)  # a partial clone must not look like a real repository
+            log.warning("git_clone_failed", extra={"repo_id": repo_id, "rc": r.rc})
+            raise GitError("Could not clone the repository from its remote", code="clone_failed")
+        head = await self._run(repo_id, ["symbolic-ref", "--short", "--quiet", "HEAD"])
+        branch = head.out.decode(errors="replace").strip()
+        if not branch:  # detached or empty remote: nothing to serve
+            self.storage.remove(repo_id)
+            raise InvalidInput("The repository has no branches to import", code="remote_empty")
+        return branch
 
     def delete_repo(self, repo_id: str) -> None:
         self.storage.remove(repo_id)

@@ -51,6 +51,30 @@ def create_access_token(settings: Settings, user_id: str) -> tuple[str, int]:
     return token, settings.jwt_expiry_minutes * 60
 
 
+# ---- OAuth state ----
+# The CSRF state is a short-lived signed token instead of a server-side row: it carries its own
+# expiry and the flow's intent, so a replayed or attacker-chosen state cannot pass verification
+# and no storage has to be cleaned up. Separate audience so it is never usable as an access token.
+_STATE_AUD = "gitarchey-oauth-state"
+
+
+def create_oauth_state(settings: Settings, **claims) -> str:
+    now = int(time.time())
+    payload = {"iat": now, "exp": now + settings.github_state_ttl_s, "jti": uuid.uuid4().hex,
+               "iss": settings.jwt_issuer, "aud": _STATE_AUD, **claims}
+    return jwt.encode(payload, settings.jwt_secret.get_secret_value(), algorithm=settings.jwt_algorithm)
+
+
+def decode_oauth_state(settings: Settings, state: str) -> dict:
+    try:
+        return jwt.decode(state, settings.jwt_secret.get_secret_value(), algorithms=[settings.jwt_algorithm],
+                          issuer=settings.jwt_issuer, audience=_STATE_AUD,
+                          options={"require": ["exp", "iat", "iss", "aud"]})
+    except jwt.PyJWTError:
+        raise Unauthorized("This sign-in link expired or was tampered with. Start again.",
+                           code="oauth_state_invalid") from None
+
+
 def decode_access_token(settings: Settings, token: str) -> TokenClaims:
     try:
         p = jwt.decode(

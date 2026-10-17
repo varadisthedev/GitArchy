@@ -143,11 +143,24 @@ def test_schema_is_additive_and_versioned():
 
 
 def test_migrate_applies_pending_only():
-    seen = []
+    def run(applied: set[int]):
+        seen = []
 
-    class S:
-        def execute(self, cql, params=None):
-            seen.append(cql)
-            return [{"version": 1}] if cql.startswith("SELECT version") else []
-    assert schema.migrate(S()) == []
+        class S:
+            def execute(self, cql, params=None):
+                seen.append(cql)
+                return [{"version": v} for v in applied] if cql.startswith("SELECT version") else []
+        return schema.migrate(S()), seen
+
+    versions = [v for v, _, _ in schema.MIGRATIONS]
+    # everything already applied: no DDL beyond the version table itself
+    done, seen = run(set(versions))
+    assert done == []
     assert not any(c.startswith("CREATE TABLE IF NOT EXISTS users_by_id") for c in seen)
+    # only the first applied: every later migration runs, the first does not re-run
+    done, seen = run({versions[0]})
+    assert done == versions[1:]
+    assert not any(c.startswith("CREATE TABLE IF NOT EXISTS users_by_id") for c in seen)
+    # fresh keyspace: all of them, in order
+    done, _ = run(set())
+    assert done == versions == sorted(versions)

@@ -60,6 +60,16 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
             repo_id uuid, finished_at timestamp, job_id uuid, task_type text, summary text,
             PRIMARY KEY ((repo_id), finished_at, job_id)) WITH CLUSTERING ORDER BY (finished_at DESC, job_id ASC)""",
     ]),
+    (2, "github identities", [
+        # one GitHub account <-> one Gitarchey user. The claim table makes sign-in a single-partition read
+        # and stops two users binding the same GitHub account.
+        """CREATE TABLE IF NOT EXISTS users_by_github_id (
+            github_id bigint PRIMARY KEY, user_id uuid)""",
+        # the OAuth token lives only here, so get_user() on every authenticated request never loads it
+        """CREATE TABLE IF NOT EXISTS github_identity_by_user (
+            user_id uuid PRIMARY KEY, github_id bigint, login text, access_token text, scope text,
+            avatar_url text, connected_at timestamp)""",
+    ]),
 ]
 
 VERSION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (

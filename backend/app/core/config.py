@@ -62,6 +62,21 @@ class Settings(BaseSettings):
     filebase_bucket_name: str = ""
     external_timeout_s: float = 10.0
 
+    # github oauth (sign-in + repository import). No client id => the feature is off and the routes 503.
+    github_client_id: str = ""
+    github_client_secret: SecretStr = SecretStr("")
+    # Where GitHub sends the user back. Must match the OAuth app exactly and point at the FRONTEND page
+    # that forwards ?code/?state to the API, e.g. https://gitarchy.vercel.app/auth/github/callback
+    github_oauth_redirect_uri: str = ""
+    github_oauth_base: str = "https://github.com"
+    github_api_base: str = "https://api.github.com"
+    # "repo" is what lets private repositories be read; drop it to "public_repo" to offer public-only import
+    github_scopes: str = "read:user user:email repo"
+    github_state_ttl_s: int = 600
+    github_max_repo_kb: int = 500_000  # refuse to clone anything bigger (GitHub reports size in KB)
+    github_clone_timeout_s: float = 300.0
+    github_index_commits: int = 100  # recent commits mirrored into commits_by_repo for the UI
+
     # cloudinary
     cloudinary_cloud_name: str = ""
     cloudinary_api_key: str = ""
@@ -79,6 +94,9 @@ class Settings(BaseSettings):
     rl_commit: str = "60/minute"
     rl_upload: str = "20/hour"
     rl_analytics_submit: str = "10/hour"
+    rl_github_oauth: str = "20/hour"
+    rl_github_import: str = "60/hour"
+    rl_github_list: str = "60/hour"
     rl_ws_connect: str = "30/minute"
     rl_default_authed: str = "300/minute"
     rl_default_anon: str = "60/minute"
@@ -140,6 +158,11 @@ class Settings(BaseSettings):
     def r2_configured(self) -> bool:
         return self.filebase_configured or all([self.r2_access_key_id, self.r2_secret_access_key.get_secret_value(),
                     self.r2_bucket_name, self.r2_endpoint_url or self.r2_account_id])
+
+    @property
+    def github_configured(self) -> bool:
+        return all([self.github_client_id, self.github_client_secret.get_secret_value(),
+                    self.github_oauth_redirect_uri])
 
     @property
     def cloudinary_configured(self) -> bool:

@@ -123,6 +123,51 @@ class AstraStore:
                           tuple(fields[c] for c in cols) + (_u(user_id),))
         return await self.get_user(user_id)
 
+    # ---- github identity ----
+    @staticmethod
+    def _ident(r: dict | None) -> dict | None:
+        if not r:
+            return None
+        return {"user_id": str(r["user_id"]), "github_id": int(r["github_id"]), "login": r["login"],
+                "access_token": r["access_token"], "scope": r["scope"] or "",
+                "avatar_url": r["avatar_url"], "connected_at": _ts(r["connected_at"])}
+
+    async def set_github_identity(self, user_id: str, ident: dict) -> None:
+        """Claim the GitHub account for this user, then store the token. Re-connecting the same
+        account by the same user is idempotent; another user's account raises Conflict."""
+        uid, gid = _u(user_id), int(ident["github_id"])
+        ok, row = await self._applied(
+            "INSERT INTO users_by_github_id (github_id, user_id) VALUES (?, ?) IF NOT EXISTS", (gid, uid))
+        if not ok and str(row.get("user_id")) != str(uid):
+            owner = str(row.get("user_id"))
+            if await self.get_user(owner) is None:  # orphan claim: the user row is gone, re-claim
+                ok, _ = await self._applied(
+                    "UPDATE users_by_github_id SET user_id = ? WHERE github_id = ? IF user_id = ?",
+                    (uid, gid, row.get("user_id")))
+            if not ok:
+                raise Conflict("That GitHub account is already linked to another Gitarchey user",
+                               code="github_already_linked")
+        await self._x(
+            "INSERT INTO github_identity_by_user (user_id, github_id, login, access_token, scope, "
+            "avatar_url, connected_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (uid, gid, ident["login"], ident["access_token"], ident.get("scope", ""),
+             ident.get("avatar_url"), ident.get("connected_at") or utcnow()))
+
+    async def get_github_identity(self, user_id: str) -> dict | None:
+        rows = await self._x("SELECT * FROM github_identity_by_user WHERE user_id = ?", (_u(user_id),))
+        return self._ident(rows[0] if rows else None)
+
+    async def get_user_by_github_id(self, github_id: int) -> dict | None:
+        rows = await self._x("SELECT user_id FROM users_by_github_id WHERE github_id = ?", (int(github_id),))
+        return await self.get_user(str(rows[0]["user_id"])) if rows else None  # orphan claim -> None
+
+    async def clear_github_identity(self, user_id: str) -> None:
+        ident = await self.get_github_identity(user_id)
+        await self._x("DELETE FROM github_identity_by_user WHERE user_id = ?", (_u(user_id),))
+        if ident:  # release the claim only if it is still ours
+            await self._x("DELETE FROM users_by_github_id WHERE github_id = ? IF user_id = ?",
+                          (int(ident["github_id"]), _u(user_id)))
+
     # ---- token revocation ----
     async def revoke_token(self, jti: str, ttl_s: int) -> None:
         await self._x("INSERT INTO revoked_tokens (jti, revoked_at) VALUES (?, ?) USING TTL ?",

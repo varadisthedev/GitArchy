@@ -25,6 +25,8 @@ class MemoryStore:
         self.users: dict[str, dict] = {}
         self.emails: dict[str, str] = {}
         self.revoked: dict[str, float] = {}
+        self.github: dict[str, dict] = {}
+        self.github_ids: dict[int, str] = {}
         self.repos: dict[str, dict] = {}
         self.owner_names: dict[tuple[str, str], str] = {}
         self.members: dict[tuple[str, str], str] = {}
@@ -65,6 +67,33 @@ class MemoryStore:
                 return None
             u.update(fields)
             return dict(u)
+
+    # ---- github identity ----
+    async def set_github_identity(self, user_id: str, ident: dict) -> None:
+        async with self._lock:
+            gid = int(ident["github_id"])
+            owner = self.github_ids.get(gid)
+            if owner and owner != user_id:
+                raise Conflict("That GitHub account is already linked to another Gitarchey user",
+                               code="github_already_linked")
+            self.github_ids[gid] = user_id
+            self.github[user_id] = {**ident, "user_id": user_id, "github_id": gid,
+                                    "scope": ident.get("scope", ""),
+                                    "connected_at": ident.get("connected_at") or utcnow()}
+
+    async def get_github_identity(self, user_id: str) -> dict | None:
+        i = self.github.get(user_id)
+        return dict(i) if i else None
+
+    async def get_user_by_github_id(self, github_id: int) -> dict | None:
+        uid = self.github_ids.get(int(github_id))
+        return await self.get_user(uid) if uid else None
+
+    async def clear_github_identity(self, user_id: str) -> None:
+        async with self._lock:
+            ident = self.github.pop(user_id, None)
+            if ident:
+                self.github_ids.pop(int(ident["github_id"]), None)
 
     # ---- token revocation ----
     async def revoke_token(self, jti: str, ttl_s: int) -> None:
