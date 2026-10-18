@@ -89,3 +89,42 @@ def test_top_files_counts_basenames_across_directories():
 def test_an_empty_tree_is_refused():
     with pytest.raises(TaskError):
         run([])
+
+
+def test_assets_are_named_not_dumped_into_other():
+    """A tree of PNGs and fonts must not report itself as 84% "Other" (measured in bytes, assets dominate)."""
+    out = run([{"path": "public/hero.png", "size": 900}, {"path": "public/icon.svg", "size": 100},
+               {"path": "public/f.woff2", "size": 400}, {"path": "src/app.ts", "size": 100},
+               {"path": "yarn.lock", "size": 50}, {"path": "dist/app.js.map", "size": 50}])
+    by = {lang["language"]: lang for lang in out["languages"]}
+    assert by["Images"] == {"language": "Images", "bytes": 1000, "files": 2, "share": 1000 / 1600}
+    assert by["Fonts"]["bytes"] == 400 and by["Lockfiles"]["bytes"] == 50
+    assert by["Source maps"]["bytes"] == 50 and by["TypeScript"]["bytes"] == 100
+    assert "Other" not in by
+
+
+def test_powershell_and_friends_are_recognised():
+    out = run([{"path": "s.ps1", "size": 10}, {"path": "m.psm1", "size": 10},
+               {"path": "b.bat", "size": 10}, {"path": "q.graphql", "size": 10}])
+    by = {lang["language"]: lang for lang in out["languages"]}
+    assert by["PowerShell"]["files"] == 2 and by["Batch"]["files"] == 1 and by["GraphQL"]["files"] == 1
+
+
+def test_only_the_final_suffix_decides_the_language():
+    """auth.controller.js, auth.routes.js and app.min.js are all one language: JavaScript.
+
+    Multi-part names are the norm in Node/React trees. Only "Most frequent filenames" is allowed to
+    tell them apart - it counts whole basenames by design.
+    """
+    out = run([{"path": "src/userroute.route.js", "size": 10}, {"path": "src/auth.controller.js", "size": 10},
+               {"path": "src/auth.middleware.js", "size": 10}, {"path": "eslint.config.js", "size": 10},
+               {"path": "dist/app.min.js", "size": 10}, {"path": "src/authcontext.jsx", "size": 10}])
+    assert [lang["language"] for lang in out["languages"]] == ["JavaScript"]
+    assert out["languages"][0]["files"] == 6 and out["languages"][0]["share"] == 1.0
+
+
+def test_a_second_suffix_never_hides_the_real_one():
+    by = {lang["language"]: lang for lang in
+          run([{"path": "a/bundle.js.map", "size": 10}, {"path": "b/vite.config.ts", "size": 10},
+               {"path": "c/class-diagram.puml", "size": 10}])["languages"]}
+    assert set(by) == {"Source maps", "TypeScript", "PlantUML"}

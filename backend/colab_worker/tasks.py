@@ -127,8 +127,10 @@ def repo_clustering_kmeans(spark, params: dict, dataset: dict, progress: Progres
 
 
 # --------------------------------------------------------------------------- languages
-# extension -> language. Only what a repository plausibly contains; anything else counts as "Other",
-# which is honest about what this can and cannot name.
+# extension -> language, or -> asset category for the things a repository carries but isn't written in.
+# Assets are named rather than lumped into "Other": measured in BYTES, a handful of PNGs or fonts
+# outweighs every source file, and a bar that calls that 84% "Other" explains nothing. Anything still
+# unrecognised - and every extensionless or dotfile - stays "Other", which is honest about the limit.
 LANGUAGES = {
     ".py": "Python", ".ipynb": "Jupyter Notebook", ".ts": "TypeScript", ".tsx": "TypeScript",
     ".js": "JavaScript", ".jsx": "JavaScript", ".mjs": "JavaScript", ".cjs": "JavaScript",
@@ -143,6 +145,37 @@ LANGUAGES = {
     ".json": "JSON", ".yaml": "YAML", ".yml": "YAML", ".toml": "TOML", ".xml": "XML",
     ".ini": "INI", ".cfg": "INI", ".tf": "Terraform", ".proto": "Protocol Buffers",
     ".dockerfile": "Dockerfile", ".gradle": "Gradle", ".cmake": "CMake", ".vim": "Vim Script",
+    # --- more languages -------------------------------------------------
+    ".psm1": "PowerShell", ".psd1": "PowerShell", ".bat": "Batch", ".cmd": "Batch",
+    ".ksh": "Shell", ".csh": "Shell", ".mts": "TypeScript", ".cts": "TypeScript",
+    ".fs": "F#", ".fsi": "F#", ".fsx": "F#", ".vb": "Visual Basic", ".jl": "Julia",
+    ".ml": "OCaml", ".mli": "OCaml", ".elm": "Elm", ".nim": "Nim", ".cr": "Crystal",
+    ".zig": "Zig", ".nix": "Nix", ".sol": "Solidity", ".groovy": "Groovy", ".rkt": "Racket",
+    ".scm": "Scheme", ".lisp": "Lisp", ".el": "Emacs Lisp", ".tcl": "Tcl", ".awk": "Awk",
+    ".asm": "Assembly", ".s": "Assembly", ".f90": "Fortran", ".f95": "Fortran", ".pas": "Pascal",
+    ".mk": "Makefile", ".graphql": "GraphQL", ".gql": "GraphQL", ".prisma": "Prisma",
+    ".astro": "Astro", ".styl": "Stylus", ".hbs": "Handlebars", ".ejs": "EJS", ".pug": "Pug",
+    ".twig": "Twig", ".liquid": "Liquid", ".tex": "TeX", ".adoc": "AsciiDoc",
+    ".jsonc": "JSON", ".json5": "JSON", ".tfvars": "Terraform", ".puml": "PlantUML",
+    ".mermaid": "Mermaid", ".mmd": "Mermaid", ".dot": "Graphviz", ".http": "HTTP", ".rest": "HTTP",
+    # --- assets: carried by the repository, not written in ---------------
+    ".png": "Images", ".jpg": "Images", ".jpeg": "Images", ".gif": "Images", ".bmp": "Images",
+    ".ico": "Images", ".webp": "Images", ".avif": "Images", ".tiff": "Images", ".tif": "Images",
+    ".heic": "Images", ".psd": "Images", ".svg": "Images",
+    ".woff": "Fonts", ".woff2": "Fonts", ".ttf": "Fonts", ".otf": "Fonts", ".eot": "Fonts",
+    ".mp4": "Video", ".webm": "Video", ".mov": "Video", ".avi": "Video", ".mkv": "Video", ".m4v": "Video",
+    ".mp3": "Audio", ".wav": "Audio", ".ogg": "Audio", ".flac": "Audio", ".m4a": "Audio", ".aac": "Audio",
+    ".zip": "Archives", ".tar": "Archives", ".gz": "Archives", ".tgz": "Archives", ".bz2": "Archives",
+    ".xz": "Archives", ".7z": "Archives", ".rar": "Archives", ".jar": "Archives", ".war": "Archives",
+    ".pdf": "Documents", ".doc": "Documents", ".docx": "Documents", ".xls": "Documents",
+    ".xlsx": "Documents", ".ppt": "Documents", ".pptx": "Documents", ".odt": "Documents", ".rtf": "Documents",
+    ".csv": "Data", ".tsv": "Data", ".parquet": "Data", ".avro": "Data", ".orc": "Data",
+    ".db": "Data", ".sqlite": "Data", ".sqlite3": "Data",
+    ".exe": "Binaries", ".dll": "Binaries", ".so": "Binaries", ".dylib": "Binaries", ".wasm": "Binaries",
+    ".pyc": "Binaries", ".pyo": "Binaries", ".class": "Binaries", ".o": "Binaries", ".bin": "Binaries",
+    ".txt": "Text", ".log": "Text",
+    ".map": "Source maps", ".lock": "Lockfiles",
+    ".example": "Config", ".properties": "Config", ".conf": "Config",
 }
 # named by filename rather than extension
 FILENAME_LANGUAGES = {"dockerfile": "Dockerfile", "makefile": "Makefile", "cmakelists.txt": "CMake",
@@ -169,16 +202,16 @@ def language_breakdown(spark, params, dataset, progress) -> dict:
     progress(35, "reduceByKey (languages)")
     totals = (rdd.map(lambda f: (classify(f["path"]), (int(f["size"]), 1)))
               .reduceByKey(lambda a, b: (a[0] + b[0], a[1] + b[1])).collect())
-    total_bytes = sum(v[0] for _, v in totals) or 1
+    total_bytes = sum(v[0] for _, v in totals)
     total_files = sum(v[1] for _, v in totals)
-    languages = sorted(({"language": k, "bytes": v[0], "files": v[1], "share": v[0] / total_bytes}
+    languages = sorted(({"language": k, "bytes": v[0], "files": v[1], "share": v[0] / (total_bytes or 1)}
                         for k, v in totals), key=lambda d: -d["bytes"])
 
     progress(70, "reduceByKey (filenames)")
     names = (rdd.map(lambda f: (f["path"].rsplit("/", 1)[-1].lower(), 1))
              .reduceByKey(lambda a, b: a + b)
              .takeOrdered(top_files, key=lambda kv: (-kv[1], kv[0])))
-    return {"total_bytes": sum(v[0] for _, v in totals), "total_files": total_files,
+    return {"total_bytes": total_bytes, "total_files": total_files,
             "repos": len({f.get("repo_id") for f in rows}),
             "languages": languages,
             "top_files": [{"name": k, "count": c, "share": c / (total_files or 1)} for k, c in names]}
