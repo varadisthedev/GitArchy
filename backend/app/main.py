@@ -53,6 +53,9 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
         if settings.r2_configured:
             from app.integrations.git.mirror import RepoMirror
             from app.integrations.r2.client import R2Client
+            if settings.filebase_configured and settings.r2_bucket_name:
+                # both are set and only one can win: say which, rather than let the other look broken
+                log.warning("storage_provider_ambiguous", extra={"using": "filebase", "ignoring": "r2"})
             ctx.r2 = R2Client(settings)
             # object storage holds every repository; this instance's disk is a cache of it
             git.mirror = RepoMirror(ctx.r2, st, storage)

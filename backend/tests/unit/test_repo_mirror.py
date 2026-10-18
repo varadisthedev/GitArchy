@@ -95,6 +95,40 @@ async def test_a_repository_with_no_snapshot_says_so(git_with_mirror):
     assert e.value.code == "repo_storage_unavailable"
 
 
+async def test_concurrent_snapshots_leave_object_and_hash_agreeing(git_with_mirror):
+    """Uploads finishing in one order and recording hashes in the other would fail every later read."""
+    import asyncio
+
+    git, store, storage, s3 = git_with_mirror
+    rid = await _repo(store)
+    await git.init_repo(rid, "main", b"# notes", "Dev", "dev@example.com")
+    for i in range(3):
+        await git.commit_files(rid, "main", [(f"f{i}.txt", b"x")], f"c{i}", "Dev", "dev@example.com")
+
+    await asyncio.gather(*(git.mirror.snapshot(rid) for _ in range(5)))
+
+    import hashlib
+    stored = hashlib.sha256(s3.objects[key_for(rid)][0]).hexdigest()
+    assert stored == (await store.get_repo(rid))["storage_sha"]
+    storage.remove(rid)
+    await git.log(rid, "main", 10)   # and the pair is actually usable
+
+
+async def test_a_snapshot_cannot_resurrect_a_deleted_repository(git_with_mirror):
+    git, store, storage, s3 = git_with_mirror
+    rid = await _repo(store)
+    await git.init_repo(rid, "main", b"# notes", "Dev", "dev@example.com")
+    await store.delete_repo(rid)
+    await git.mirror.forget(rid)
+
+    await git.mirror.snapshot(rid)   # a write that was already in flight when the delete landed
+
+    assert await store.get_repo(rid) is None   # the row must not come back as an upsert
+    assert key_for(rid) not in s3.objects      # nor the data of a deleted repository
+    # and the conditional write refuses on its own, for a delete that lands mid-upload
+    assert await store.set_repo_storage(rid, 'k', 'sha', utcnow()) is False
+
+
 async def test_forget_destroys_the_durable_copy(git_with_mirror):
     git, store, storage, s3 = git_with_mirror
     rid = await _repo(store)

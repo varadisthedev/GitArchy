@@ -146,6 +146,14 @@ class MemoryStore:
             r.update(fields)
             return dict(r)
 
+    async def set_repo_storage(self, repo_id: str, key: str, sha: str, at) -> bool:
+        async with self._lock:
+            r = self.repos.get(repo_id)
+            if not r:
+                return False
+            r.update(storage_key=key, storage_sha=sha, storage_at=at)
+            return True
+
     async def delete_repo(self, repo_id: str) -> None:
         async with self._lock:
             r = self.repos.pop(repo_id, None)

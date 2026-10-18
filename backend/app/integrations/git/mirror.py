@@ -66,26 +66,39 @@ class RepoMirror:
         return self._locks.setdefault(repo_id, asyncio.Lock())
 
     async def snapshot(self, repo_id: str) -> None:
-        """Write the current state to object storage. Called after every change to a repository."""
+        """Write the current state to object storage. Called after every change to a repository.
+
+        Serialised per repository, and under the same lock as rehydrate and forget. Two concurrent
+        writers could otherwise upload in one order and record their hashes in the other, leaving the
+        object and the recorded sha permanently disagreeing - which fails every later read as corrupt.
+        """
         path = self.storage.path_for(repo_id)
         if not path.is_dir():
             return
-        with tempfile.TemporaryDirectory(prefix="gitarchey-snap-") as tmp:
-            archive = Path(tmp) / "repo.tar"
-            sha = await asyncio.to_thread(_pack, path, archive)
-            size = archive.stat().st_size
-            key = key_for(repo_id)
-            try:
-                await self.r2.upload_file(key, archive, "application/x-tar", {"repo_id": repo_id})
-            except Exception as e:
-                # the change is on disk but not durable, and this host's disk does not survive a
-                # restart. Say so rather than report success for something that may vanish.
-                log.error("repo_snapshot_failed", extra={"repo_id": repo_id, "error": str(e)[:200]})
-                raise Unavailable("The change was made but object storage is unreachable, so it is not "
-                                  "saved durably yet. Try again once storage is back.",
-                                  code="storage_unreachable") from None
-        await self.store.update_repo(repo_id, storage_key=key, storage_sha=sha, storage_at=utcnow())
-        log.info("repo_snapshot", extra={"repo_id": repo_id, "bytes": size})
+        async with self._lock(repo_id):
+            if not await self.store.get_repo(repo_id):   # deleted while this write was in flight
+                return
+            with tempfile.TemporaryDirectory(prefix="gitarchey-snap-") as tmp:
+                archive = Path(tmp) / "repo.tar"
+                sha = await asyncio.to_thread(_pack, path, archive)
+                size = archive.stat().st_size
+                key = key_for(repo_id)
+                try:
+                    await self.r2.upload_file(key, archive, "application/x-tar", {"repo_id": repo_id})
+                except Exception as e:
+                    # the change is on disk but not durable, and this host's disk does not survive a
+                    # restart. Say so rather than report success for something that may vanish.
+                    log.error("repo_snapshot_failed", extra={"repo_id": repo_id, "error": str(e)[:200]})
+                    raise Unavailable("The change was made but object storage is unreachable, so it is "
+                                      "not saved durably yet. Try again once storage is back.",
+                                      code="storage_unreachable") from None
+            if not await self.store.set_repo_storage(repo_id, key, sha, utcnow()):
+                # the repository was deleted after the check above: take the object with it rather
+                # than leave the data of a deleted repository sitting in the bucket
+                log.info("repo_snapshot_discarded", extra={"repo_id": repo_id})
+                await self._delete_object(repo_id)
+                return
+            log.info("repo_snapshot", extra={"repo_id": repo_id, "bytes": size})
 
     async def rehydrate(self, repo_id: str) -> None:
         """Put the repository back on disk from object storage. No-op when it is already there."""
@@ -109,8 +122,16 @@ class RepoMirror:
             log.info("repo_rehydrated", extra={"repo_id": repo_id, "bytes": size})
 
     async def forget(self, repo_id: str) -> None:
-        """Destroy the durable copy. Only for a repository the user actually deleted."""
+        """Destroy the durable copy. Only for a repository the user actually deleted.
+
+        Takes the same lock as snapshot, so a write still in flight finishes first and its object is
+        deleted here, rather than landing in the bucket just after this ran.
+        """
+        async with self._lock(repo_id):
+            await self._delete_object(repo_id)
+
+    async def _delete_object(self, repo_id: str) -> None:
         try:
             await self.r2.delete(key_for(repo_id))
-        except Exception:  # the row is already gone; a stray object is garbage, not a failure
+        except Exception:  # a stray object is garbage to collect later, not a failed deletion
             log.warning("repo_snapshot_delete_failed", extra={"repo_id": repo_id})

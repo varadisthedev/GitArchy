@@ -243,6 +243,14 @@ class AstraStore:
                           tuple(fields[c] for c in cols) + (_u(repo_id),))
         return await self.get_repo(repo_id)
 
+    async def set_repo_storage(self, repo_id: str, key: str, sha: str, at) -> bool:
+        """Point the row at a stored copy, but only while the row exists. A plain UPDATE in Cassandra is
+        an upsert, so without IF EXISTS a snapshot racing a delete would resurrect the repository."""
+        ok, _ = await self._applied(
+            "UPDATE repositories_by_id SET storage_key = ?, storage_sha = ?, storage_at = ? "
+            "WHERE repo_id = ? IF EXISTS", (key, sha, at, _u(repo_id)))
+        return ok
+
     async def delete_repo(self, repo_id: str) -> None:
         rid = _u(repo_id)
         repo = await self.get_repo(repo_id)
