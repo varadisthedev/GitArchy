@@ -4,7 +4,7 @@ nothing in this module executes code received over the wire.
 Every Spark closure is a lambda/nested function defined inside the task (cloudpickle ships those by value),
 so executors never need to import this file - important for Colab and Windows.
 """
-import math
+
 import re
 from typing import Callable
 
@@ -126,44 +126,62 @@ def repo_clustering_kmeans(spark, params: dict, dataset: dict, progress: Progres
                           "mean": {c: round(float(s[c]), 2) for c in cols}} for s in summary]}
 
 
-_FIX = re.compile(r"\b(fix|fixes|fixed|bug|patch|hotfix)\b")
+# --------------------------------------------------------------------------- languages
+# extension -> language. Only what a repository plausibly contains; anything else counts as "Other",
+# which is honest about what this can and cannot name.
+LANGUAGES = {
+    ".py": "Python", ".ipynb": "Jupyter Notebook", ".ts": "TypeScript", ".tsx": "TypeScript",
+    ".js": "JavaScript", ".jsx": "JavaScript", ".mjs": "JavaScript", ".cjs": "JavaScript",
+    ".java": "Java", ".kt": "Kotlin", ".kts": "Kotlin", ".go": "Go", ".rs": "Rust",
+    ".c": "C", ".h": "C", ".cpp": "C++", ".cc": "C++", ".cxx": "C++", ".hpp": "C++",
+    ".cs": "C#", ".rb": "Ruby", ".php": "PHP", ".swift": "Swift", ".m": "Objective-C",
+    ".scala": "Scala", ".sh": "Shell", ".bash": "Shell", ".zsh": "Shell", ".ps1": "PowerShell",
+    ".sql": "SQL", ".r": "R", ".lua": "Lua", ".dart": "Dart", ".ex": "Elixir", ".exs": "Elixir",
+    ".pl": "Perl", ".hs": "Haskell", ".clj": "Clojure", ".erl": "Erlang", ".vue": "Vue",
+    ".svelte": "Svelte", ".html": "HTML", ".htm": "HTML", ".css": "CSS", ".scss": "SCSS",
+    ".sass": "SCSS", ".less": "Less", ".md": "Markdown", ".mdx": "Markdown", ".rst": "reStructuredText",
+    ".json": "JSON", ".yaml": "YAML", ".yml": "YAML", ".toml": "TOML", ".xml": "XML",
+    ".ini": "INI", ".cfg": "INI", ".tf": "Terraform", ".proto": "Protocol Buffers",
+    ".dockerfile": "Dockerfile", ".gradle": "Gradle", ".cmake": "CMake", ".vim": "Vim Script",
+}
+# named by filename rather than extension
+FILENAME_LANGUAGES = {"dockerfile": "Dockerfile", "makefile": "Makefile", "cmakelists.txt": "CMake",
+                      "rakefile": "Ruby", "gemfile": "Ruby", "vagrantfile": "Ruby"}
 
 
-def commit_classification_logreg(spark, params: dict, dataset: dict, progress: Progress) -> dict:
-    """Logistic Regression: predict whether a commit is a bug-fix (by message) from its size features."""
-    from pyspark.ml.classification import LogisticRegression
-    from pyspark.ml.evaluation import BinaryClassificationEvaluator, MulticlassClassificationEvaluator
-    from pyspark.ml.feature import StandardScaler, VectorAssembler
-    rows = _commits(dataset)
-    if len(rows) < 20:
-        raise TaskError("need at least 20 commits")
-    frac = float(params.get("train_fraction", 0.7))
-    pattern = _FIX
-    progress(10, "features")
-    data = [(1.0 if pattern.search(r["message"].lower()) else 0.0, float(r["additions"]), float(r["deletions"]),
-             float(r["files_changed"]), float(len(r["message"])), math.log1p(r["additions"] + r["deletions"]))
-            for r in rows]
-    positives = sum(d[0] for d in data)
-    if positives == 0 or positives == len(data):
-        raise TaskError("only one class present (no variation between fix / non-fix commits)")
-    cols = ["additions", "deletions", "files_changed", "msg_len", "log_churn"]
-    df = spark.createDataFrame(data, ["label", *cols])
-    feats = VectorAssembler(inputCols=cols, outputCol="raw").transform(df)
-    scaled = StandardScaler(inputCol="raw", outputCol="features").fit(feats).transform(feats)
-    train, test = scaled.randomSplit([frac, 1 - frac], seed=int(params.get("seed", 42)))
-    progress(50, "train")
-    model = LogisticRegression(maxIter=50, featuresCol="features", labelCol="label").fit(train)
-    pred = model.transform(test)
-    n_test = pred.count()
-    acc = MulticlassClassificationEvaluator(labelCol="label", metricName="accuracy").evaluate(pred) if n_test else None
-    auc = None
-    try:
-        auc = float(BinaryClassificationEvaluator(labelCol="label").evaluate(pred))
-    except Exception:
-        pass
-    return {"label": "fix_commit", "n_train": train.count(), "n_test": n_test, "positive_rate": round(positives / len(data), 4),
-            "accuracy": acc, "auc": auc, "features": cols,
-            "coefficients": [round(float(c), 4) for c in model.coefficients], "intercept": round(float(model.intercept), 4)}
+def language_breakdown(spark, params, dataset, progress) -> dict:
+    """map -> reduceByKey over the file tree: bytes and file counts per language, plus common filenames."""
+    rows = dataset.get("files") or []
+    if not rows:
+        raise TaskError("dataset has no files")
+    top_files = int(params.get("top_files", 10))
+    langs, by_name = LANGUAGES, FILENAME_LANGUAGES
+
+    def classify(path):
+        name = path.rsplit("/", 1)[-1].lower()
+        if name in by_name:
+            return by_name[name]
+        dot = name.rfind(".")
+        return langs.get(name[dot:], "Other") if dot > 0 else "Other"
+
+    progress(10, "parallelize")
+    rdd = spark.sparkContext.parallelize(rows, _slices(len(rows))).cache()
+    progress(35, "reduceByKey (languages)")
+    totals = (rdd.map(lambda f: (classify(f["path"]), (int(f["size"]), 1)))
+              .reduceByKey(lambda a, b: (a[0] + b[0], a[1] + b[1])).collect())
+    total_bytes = sum(v[0] for _, v in totals) or 1
+    total_files = sum(v[1] for _, v in totals)
+    languages = sorted(({"language": k, "bytes": v[0], "files": v[1], "share": v[0] / total_bytes}
+                        for k, v in totals), key=lambda d: -d["bytes"])
+
+    progress(70, "reduceByKey (filenames)")
+    names = (rdd.map(lambda f: (f["path"].rsplit("/", 1)[-1].lower(), 1))
+             .reduceByKey(lambda a, b: a + b)
+             .takeOrdered(top_files, key=lambda kv: (-kv[1], kv[0])))
+    return {"total_bytes": sum(v[0] for _, v in totals), "total_files": total_files,
+            "repos": len({f.get("repo_id") for f in rows}),
+            "languages": languages,
+            "top_files": [{"name": k, "count": c, "share": c / (total_files or 1)} for k, c in names]}
 
 
 TASKS: dict[str, Callable] = {
@@ -171,5 +189,5 @@ TASKS: dict[str, Callable] = {
     "message_terms_mapreduce": message_terms_mapreduce,
     "file_stats_sql": file_stats_sql,
     "repo_clustering_kmeans": repo_clustering_kmeans,
-    "commit_classification_logreg": commit_classification_logreg,
+    "language_breakdown": language_breakdown,
 }

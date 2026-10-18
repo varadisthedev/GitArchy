@@ -197,7 +197,7 @@ def test_limits_and_param_validation(client, alice, repo):
     assert third.status_code == 429 and third.json()["error"]["code"] == "analytics_quota_exceeded"
     for task, params in (("repo_clustering_kmeans", {"k": 1}), ("repo_clustering_kmeans", {"k": 99}),
                          ("commit_activity_rdd", {"group_by": "; import os"}), ("file_stats_sql", {"x": 1}),
-                         ("exec_python", {}), ("commit_classification_logreg", {"train_fraction": 0.1})):
+                         ("exec_python", {}), ("language_breakdown", {"top_files": 0})):
         r = submit(client, h, repo, task=task, params=params)
         assert r.status_code == 422, (task, params, r.status_code)
 

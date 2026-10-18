@@ -13,6 +13,7 @@ import { Markdown } from "@/components/repository/markdown";
 import { PathCrumbs } from "@/components/repository/path-crumbs";
 import { blobHref, entryIcon, newFileHref, treeHref } from "@/components/repository/urls";
 import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
+import { LanguagesCard } from "@/components/repository/languages-card";
 
 const isBranchRef = (ref: string) => !/^[0-9a-f]{7,40}$/.test(ref);
 
@@ -117,6 +118,8 @@ export function CodeBrowser({ id, refParam, path }: { id: string; refParam?: str
         ) : null}
       </section>
 
+      {/* only at the repository root: a subdirectory's languages are not the repository's */}
+      {!path ? <LanguagesCard repoId={id} /> : null}
       {readme ? <Readme repoId={id} gitRef={ref} dir={path} name={readme.name} /> : null}
     </div>
   );

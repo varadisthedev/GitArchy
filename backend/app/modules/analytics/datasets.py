@@ -15,6 +15,7 @@ async def build_dataset(ctx: Context, job: dict) -> dict:
     cfg = ctx.settings
     kind = TASKS[job["task_type"]][1]
     commits: list[dict] = []
+    files: list[dict] = []
     per_repo: dict[str, dict] = {}
     repo_ids = job["repo_ids"]
     budget = cfg.analytics_max_dataset_rows
@@ -25,6 +26,14 @@ async def build_dataset(ctx: Context, job: dict) -> dict:
             raise DatasetError("A repository is no longer accessible") from None
         if budget <= 0:
             break
+        if kind == "files":
+            # the tree at the default branch: what the repository holds now, not what changed
+            tree = await ctx.git.tree_files(repo["id"], repo["default_branch"], budget)
+            budget -= len(tree)
+            for f in tree:
+                f["repo_id"] = repo["id"]
+            files += tree
+            continue
         rows = await ctx.git.analytics_log(repo["id"], repo["default_branch"], budget)
         budget -= len(rows)
         for r in rows:
@@ -34,11 +43,13 @@ async def build_dataset(ctx: Context, job: dict) -> dict:
             "repo_id": repo["id"], "commits": len(rows),
             "additions": sum(r["additions"] for r in rows), "deletions": sum(r["deletions"] for r in rows),
             "files_changed": sum(r["files_changed"] for r in rows), "authors": len({r["author"] for r in rows})}
-    data = {"commits": commits} if kind == "commits" else {"repos": list(per_repo.values())}
+    data = ({"commits": commits} if kind == "commits"
+            else {"files": files} if kind == "files"
+            else {"repos": list(per_repo.values())})
     size = len(json.dumps(data))
     if size > cfg.analytics_max_dataset_bytes:
         raise DatasetError("Dataset too large; select fewer repositories")
-    n = len(commits) if kind == "commits" else len(per_repo)
+    n = len(commits) if kind == "commits" else len(files) if kind == "files" else len(per_repo)
     if n == 0:
         raise DatasetError("No data to analyse")
     if job["task_type"] == "repo_clustering_kmeans" and n < job["params"].get("k", 3):

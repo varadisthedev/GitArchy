@@ -118,6 +118,13 @@ async def test_import_clones_indexes_and_feeds_analytics(ctx, remote, monkeypatc
     assert {c["message"] for c in data["commits"]} == {"first commit", "second commit"}
     assert all(c["repo_id"] == repo["id"] for c in data["commits"])
 
+    # the language breakdown reads the tree instead: files that exist now, with their blob sizes
+    tree = await build_dataset(ctx, {"task_type": "language_breakdown", "user_id": auth.id,
+                                     "repo_ids": [repo["id"]], "params": {}})
+    assert tree["kind"] == "files" and tree["rows"] == len(tree["files"])
+    assert {f["path"] for f in tree["files"]} == {"a.py", "b.md"}
+    assert all(f["size"] > 0 and f["repo_id"] == repo["id"] for f in tree["files"])
+
 
 async def test_restore_reclones_a_repository_whose_disk_was_wiped(ctx, remote, monkeypatch):
     """The whole point of recording `source`: an ephemeral host loses the clone, not the repository."""

@@ -84,10 +84,20 @@ def test_kmeans_separates_obvious_groups(spark):
         TASKS["repo_clustering_kmeans"](spark, {"k": 9}, {"repos": small}, noop)
 
 
-def test_logreg_runs_and_guards_single_class(spark):
-    out = TASKS["commit_classification_logreg"](spark, {"train_fraction": 0.7, "seed": 3}, {"commits": commits(80)}, noop)
-    assert out["n_train"] + out["n_test"] == 80 and len(out["coefficients"]) == 5 and 0 < out["positive_rate"] < 1
+def test_language_breakdown_matches_a_hand_count(spark):
+    files = ([{"path": f"src/a{i}.py", "size": 100} for i in range(3)]
+             + [{"path": "web/app.ts", "size": 400}, {"path": "web/app.css", "size": 100}]
+             + [{"path": "Dockerfile", "size": 50}, {"path": "bin/tool", "size": 50}]
+             + [{"path": f"pkg{i}/README.md", "size": 25} for i in range(2)])
+    out = TASKS["language_breakdown"](spark, {"top_files": 3}, {"files": files}, noop)
+
+    by = {l["language"]: l for l in out["languages"]}
+    assert out["total_bytes"] == 950 and out["total_files"] == 9
+    assert by["Python"]["bytes"] == 300 and by["Python"]["files"] == 3
+    assert by["TypeScript"]["bytes"] == 400 and by["Dockerfile"]["bytes"] == 50
+    assert by["Other"]["files"] == 1                      # bin/tool has no extension
+    assert out["languages"][0]["language"] == "TypeScript"  # ordered by bytes, not file count
+    assert abs(sum(l["share"] for l in out["languages"]) - 1.0) < 1e-9
+    assert out["top_files"][0] == {"name": "readme.md", "count": 2, "share": 2 / 9}
     with pytest.raises(TaskError):
-        TASKS["commit_classification_logreg"](spark, {}, {"commits": [{**c, "message": "add x"} for c in commits(30)]}, noop)
-    with pytest.raises(TaskError):
-        TASKS["commit_classification_logreg"](spark, {}, {"commits": commits(5)}, noop)
+        TASKS["language_breakdown"](spark, {}, {"files": []}, noop)

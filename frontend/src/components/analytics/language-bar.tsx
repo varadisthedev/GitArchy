@@ -1,0 +1,74 @@
+"use client";
+
+import type { LanguagesResult } from "@/lib/api/types";
+
+/**
+ * Share of the repository by language, as one stacked bar.
+ *
+ * Measured in bytes of the file tree, not files changed, so it answers "what is this repository made
+ * of" rather than "what has been edited lately". Colours are each language's own, which is the one
+ * place this UI deliberately steps outside its palette: a reader recognises Go's cyan faster than any
+ * ordering we could invent. Anything under MIN_SHARE is folded into Other so the bar stays readable.
+ */
+const MIN_SHARE = 0.005;
+
+// Linguist's colours, for the languages this server can name. Unknown ones fall back to a stable hue.
+const COLORS: Record<string, string> = {
+  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572a5", Java: "#b07219",
+  Go: "#00add8", Rust: "#dea584", C: "#555555", "C++": "#f34b7d", "C#": "#178600",
+  Ruby: "#701516", PHP: "#4f5d95", Swift: "#f05138", Kotlin: "#a97bff", Scala: "#c22d40",
+  Dart: "#00b4ab", Elixir: "#6e4a7e", Haskell: "#5e5086", Clojure: "#db5855", Erlang: "#b83998",
+  Lua: "#000080", Perl: "#0298c3", R: "#198ce7", "Objective-C": "#438eff", Shell: "#89e051",
+  PowerShell: "#012456", Vue: "#41b883", Svelte: "#ff3e00", HTML: "#e34c26", CSS: "#563d7c",
+  SCSS: "#c6538c", Less: "#1d365d", Markdown: "#083fa1", reStructuredText: "#141414",
+  JSON: "#a4a4a4", YAML: "#cb171e", TOML: "#9c4221", XML: "#0060ac", INI: "#d1dbe0",
+  SQL: "#e38c00", "Jupyter Notebook": "#da5b0b", Dockerfile: "#384d54", Makefile: "#427819",
+  CMake: "#da3434", Gradle: "#02303a", Terraform: "#844fba", "Protocol Buffers": "#c1cdd4",
+  "Vim Script": "#199f4b", Other: "var(--fg-4)",
+};
+
+/** Stable per-name hue, so an unnamed language keeps the same colour between runs and views. */
+function colorFor(language: string): string {
+  if (COLORS[language]) return COLORS[language];
+  let h = 0;
+  for (const ch of language) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `oklch(0.68 0.13 ${h})`;
+}
+
+const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+const bytes = (v: number) =>
+  v < 1024 ? `${v} B` : v < 1024 ** 2 ? `${(v / 1024).toFixed(1)} KB` : `${(v / 1024 ** 2).toFixed(1)} MB`;
+
+export function LanguageBar({ languages, totalBytes }: { languages: LanguagesResult["languages"]; totalBytes: number }) {
+  const big = languages.filter((l) => l.share >= MIN_SHARE);
+  const restShare = languages.filter((l) => l.share < MIN_SHARE).reduce((s, l) => s + l.share, 0);
+  const shown = restShare > 0 ? [...big, { language: "Other", bytes: Math.round(restShare * totalBytes), files: 0, share: restShare }] : big;
+
+  return (
+    <div>
+      <div
+        className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-surface"
+        role="img"
+        aria-label={shown.map((l) => `${l.language} ${pct(l.share)}`).join(", ")}
+      >
+        {shown.map((l) => (
+          <span
+            key={l.language}
+            className="h-full first:rounded-l-full last:rounded-r-full"
+            style={{ width: `${l.share * 100}%`, backgroundColor: colorFor(l.language) }}
+            title={`${l.language} · ${pct(l.share)} · ${bytes(l.bytes)}`}
+          />
+        ))}
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+        {shown.map((l) => (
+          <li key={l.language} className="flex items-baseline gap-1.5 text-xs">
+            <span className="size-2 flex-none translate-y-[1px] rounded-full" style={{ backgroundColor: colorFor(l.language) }} aria-hidden />
+            <span className="font-semibold text-fg">{l.language}</span>
+            <span className="font-mono text-fg-2 tabular">{pct(l.share)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

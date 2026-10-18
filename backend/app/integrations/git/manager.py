@@ -317,6 +317,25 @@ class GitManager:
                          "additions": adds, "deletions": dels, "files_changed": files, "extensions": exts})
         return rows
 
+    async def tree_files(self, repo_id: str, ref: str, max_rows: int) -> list[dict]:
+        """Every file at `ref` with its blob size: what the repository IS, not what changed.
+
+        Language share has to be measured on the tree. Summing the extensions of changed files would
+        rank a rewritten config above the code it configures.
+        """
+        sha = await self.resolve(repo_id, ref)
+        out = await self._ok(repo_id, ["ls-tree", "-r", "-l", "-z", "--full-name", "--end-of-options", sha])
+        rows = []
+        for rec in out.decode("utf-8", "replace").split("\x00"):
+            meta, _, path = rec.partition("\t")
+            parts = meta.split()          # mode type sha size ("-" for anything but a blob)
+            if not path or len(parts) != 4 or parts[1] != "blob" or not parts[3].isdigit():
+                continue
+            rows.append({"path": path, "size": int(parts[3])})
+            if len(rows) >= max_rows:
+                break
+        return rows
+
     # ------------------------------------------------------------ write
     async def commit_files(self, repo_id: str, branch: str, changes: list[tuple[str, bytes | None]],
                            message: str, author_name: str, author_email: str,

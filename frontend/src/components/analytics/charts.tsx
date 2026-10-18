@@ -3,7 +3,7 @@
 import { BarChart3, Table2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
-  Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
   type TooltipContentProps,
 } from "recharts";
 
@@ -149,26 +149,26 @@ export function Ranked<T extends object>({ data, label, value, name }: { data: T
   );
 }
 
-/** Signed horizontal bars (model coefficients): cool for positive, warm for negative, labels carry the sign. */
-export function Signed({ data }: { data: { feature: string; value: number }[] }) {
+
+/** Several counts per x, stacked so the column height reads as the total. */
+export function StackedColumns<T extends object>({ data, x, series, height = 220 }: {
+  data: T[];
+  x: keyof T & string;
+  series: { key: keyof T & string; label: string; color: string }[];
+  height?: number;
+}) {
+  const last = series.length - 1;
   return (
-    <ResponsiveContainer width="100%" height={Math.max(120, data.length * 30 + 16)}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 48, bottom: 0, left: 0 }}>
-        <XAxis type="number" hide domain={["dataMin", "dataMax"]} />
-        <YAxis type="category" dataKey="feature" tick={{ ...AXIS, fill: "var(--fg-2)", fontSize: 12, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} width={110} interval={0} />
-        <ReferenceLine x={0} stroke="var(--stone-2)" />
-        <Tooltip cursor={{ fill: "rgb(147 138 135 / 0.1)" }} content={({ active, payload }) =>
-          active && payload?.[0] ? (
-            <div className="rounded-md border border-[#474545] bg-raised px-2.5 py-2 text-2xs">
-              <span className="font-mono text-fg">{String(payload[0].payload.feature)}</span>{" "}
-              <span className="font-mono text-fg-2">{Number(payload[0].value) >= 0 ? "+" : ""}{Number(payload[0].value).toFixed(4)}</span>
-            </div>
-          ) : null
-        } />
-        <Bar dataKey="value" name="Coefficient" radius={4} maxBarSize={18} isAnimationActive={false}
-          label={{ position: "right", fill: "var(--fg-3)", fontSize: 11, formatter: (v: unknown) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(3)}` }}>
-          {data.map((d) => <Cell key={d.feature} fill={d.value >= 0 ? VIZ.cool : VIZ.warm} />)}
-        </Bar>
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -18 }} barCategoryGap={2}>
+        <CartesianGrid vertical={false} stroke={VIZ.grid} />
+        <XAxis dataKey={x as string} tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--line)" }} minTickGap={16} />
+        <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+        <Tooltip cursor={{ fill: "rgb(147 138 135 / 0.1)" }} content={(p) => <Tip {...(p as TooltipContentProps<number, string>)} />} />
+        {series.map((s, i) => (
+          <Bar key={s.key} dataKey={s.key as string} name={s.label} stackId="a" fill={s.color} maxBarSize={36}
+            radius={i === last ? [4, 4, 0, 0] : undefined} isAnimationActive={false} />
+        ))}
       </BarChart>
     </ResponsiveContainer>
   );

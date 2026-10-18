@@ -35,9 +35,8 @@ class KMeansParams(_P):
     seed: int = Field(42, ge=0, le=2**31 - 1)
 
 
-class LogRegParams(_P):
-    train_fraction: float = Field(0.7, ge=0.5, le=0.9)
-    seed: int = Field(42, ge=0, le=2**31 - 1)
+class LanguagesParams(_P):
+    top_files: int = Field(10, ge=1, le=50)
 
 
 # task_type -> (params model, dataset kind)
@@ -46,10 +45,10 @@ TASKS: dict[str, tuple[type[BaseModel], str]] = {
     "message_terms_mapreduce": (TermsParams, "commits"),      # flatMap + map + reduceByKey (RDD)
     "file_stats_sql": (FileStatsParams, "commits"),           # DataFrame + Spark SQL
     "repo_clustering_kmeans": (KMeansParams, "repos"),        # MLlib KMeans
-    "commit_classification_logreg": (LogRegParams, "commits"),  # MLlib LogisticRegression
+    "language_breakdown": (LanguagesParams, "files"),        # RDD map + reduceByKey over the tree
 }
 TaskType = Literal["commit_activity_rdd", "message_terms_mapreduce", "file_stats_sql",
-                   "repo_clustering_kmeans", "commit_classification_logreg"]
+                   "repo_clustering_kmeans", "language_breakdown"]
 
 # ---------------------------------------------------------------- messages
 

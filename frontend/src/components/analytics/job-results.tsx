@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 import type {
-  ActivityResult, FileStatsResult, JobResults, KMeansResult, LogRegResult, TermsResult,
+  ActivityResult, FileStatsResult, JobResults, KMeansResult, LanguagesResult, TermsResult,
 } from "@/lib/api/types";
-import { ChartFrame, Churn, Columns, Ranked, Signed, VIZ } from "./charts";
+import { ChartFrame, Churn, Columns, Ranked, VIZ } from "./charts";
+import { LanguageBar } from "./language-bar";
 
 type Names = (id: string) => string | undefined;
 
@@ -174,31 +175,39 @@ function KMeans({ r, name }: { r: KMeansResult; name: Names }) {
   );
 }
 
-function LogReg({ r }: { r: LogRegResult }) {
-  const coef = r.features.map((f, i) => ({ feature: f, value: r.coefficients[i] ?? 0 }));
+function Languages({ r }: { r: LanguagesResult }) {
+  const top = r.languages[0];
+  const name = r.top_files[0];
   return (
     <div className="space-y-8">
       <Facts
         items={[
-          ["Accuracy", pct(r.accuracy)],
-          ["AUC", r.auc.toFixed(3)],
-          ["Training rows", n(r.n_train)],
-          ["Test rows", n(r.n_test)],
-          ["Fix commits", pct(r.positive_rate)],
+          ["Most used", top ? <>{top.language} <span className="text-sm font-normal text-fg-2">{pct(top.share)}</span></> : "—"],
+          ["Languages", n(r.languages.length)],
+          ["Files", n(r.total_files)],
+          ["Commonest filename", name ? <>{name.name} <span className="text-sm font-normal text-fg-2">×{name.count}</span></> : "—"],
         ]}
       />
-      <p className="max-w-[70ch] text-xs text-fg-2">
-        Predicts whether a commit is a bug fix (its message mentions fixing) from size alone. An AUC near 0.5 means size
-        doesn&apos;t separate fixes from other work; with a small or unbalanced sample, treat the numbers as indicative.
-      </p>
+      <section>
+        <h3 className="mb-3 text-sm font-bold">Languages</h3>
+        <LanguageBar languages={r.languages} totalBytes={r.total_bytes} />
+        <p className="mt-3 max-w-[70ch] text-xs text-fg-2">
+          Share of {n(r.total_files)} files across {r.repos === 1 ? "this repository" : `${n(r.repos)} repositories`},
+          measured in bytes of the current tree rather than files changed — so it reflects what the code is, not what
+          was edited recently. Extensions this server doesn&apos;t recognise count as Other rather than being guessed at.
+        </p>
+      </section>
       <ChartFrame
-        title="Feature coefficients (standardised)"
-        legend={[{ label: "Raises fix likelihood", color: VIZ.cool }, { label: "Lowers it", color: VIZ.warm }]}
-        rows={coef}
-        cols={[{ key: "feature", label: "Feature" }, { key: "value", label: "Coefficient", numeric: true, format: (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(4)}` }]}
-        caption={`Intercept ${r.intercept >= 0 ? "+" : ""}${r.intercept.toFixed(4)}.`}
+        title="Most frequent filenames"
+        caption="Counted by basename, so the same name in different directories adds up."
+        rows={r.top_files}
+        cols={[
+          { key: "name", label: "Filename" },
+          { key: "count", label: "Files", numeric: true, format: n },
+          { key: "share", label: "Share", numeric: true, format: (v) => pct(Number(v)) },
+        ]}
       >
-        <Signed data={coef} />
+        <Ranked data={r.top_files} label="name" value="count" name="Files" />
       </ChartFrame>
     </div>
   );
@@ -212,7 +221,7 @@ export default function JobResultView({ results, repoName }: { results: JobResul
     case "message_terms_mapreduce": return <Terms r={r} />;
     case "file_stats_sql": return <FileStats r={r} name={repoName} />;
     case "repo_clustering_kmeans": return <KMeans r={r} name={repoName} />;
-    case "commit_classification_logreg": return <LogReg r={r} />;
+    case "language_breakdown": return <Languages r={r} />;
     default:
       return <pre className="code-well overflow-auto rounded-md p-4 text-xs">{JSON.stringify(results.result, null, 2)}</pre>;
   }

@@ -60,15 +60,12 @@ export const TASKS: TaskMeta[] = [
     ],
   },
   {
-    type: "commit_classification_logreg",
-    title: "Bug-fix classifier",
-    summary: "Logistic regression predicting whether a commit is a fix from its size features.",
-    spark: "MLlib LogisticRegression",
-    needs: "Needs at least 20 commits, with both fix and non-fix messages.",
-    params: [
-      { key: "train_fraction", label: "Training fraction", kind: "float", min: 0.5, max: 0.9, step: 0.05, default: 0.7 },
-      SEED,
-    ],
+    type: "language_breakdown",
+    title: "Language breakdown",
+    summary: "What the code is made of: share per language by size, and the filenames that repeat most.",
+    spark: "RDD map + reduceByKey",
+    needs: "Reads the file tree at each repository's default branch.",
+    params: [{ key: "top_files", label: "Top filenames", kind: "int", min: 1, max: 50, step: 1, default: 10 }],
   },
 ];
 

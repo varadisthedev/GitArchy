@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/
 import { api, API_BASE, COLD_START_TIMEOUT_MS } from "./client";
 import type {
   ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, GithubCallbackResult,
-  GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, TaskType,
+  GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, RepoLanguages, TaskType,
   Tree, User, Visibility,
 } from "./types";
 
@@ -27,6 +27,7 @@ export const qk = {
   jobs: ["jobs"] as const,
   job: (id: string) => ["jobs", id] as const,
   results: (id: string) => ["jobs", id, "results"] as const,
+  repoLanguages: (id: string) => ["repo", id, "languages"] as const,
   githubStatus: ["github", "status"] as const,
   githubRepos: ["github", "repos"] as const,
 };
@@ -301,6 +302,14 @@ export const useRestoreRepo = (id: string) => {
       Promise.all([["repo", id], qk.repos, qk.myActivity].map((queryKey) => qc.invalidateQueries({ queryKey }))),
   });
 };
+
+/** The last single-repository language breakdown, or null until one has been run. */
+export const useRepoLanguages = (id: string) =>
+  useQuery({
+    queryKey: qk.repoLanguages(id),
+    queryFn: () => api<RepoLanguages>(`/analytics/repositories/${id}/languages`),
+    staleTime: 60_000,
+  });
 
 export const useUpdateMe = () =>
   useInvalidating((b: { display_name: string }) => api<User>("/users/me", { method: "PATCH", body: b }), () => [qk.me]);

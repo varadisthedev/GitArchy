@@ -186,7 +186,7 @@ export type TaskType =
   | "message_terms_mapreduce"
   | "file_stats_sql"
   | "repo_clustering_kmeans"
-  | "commit_classification_logreg";
+  | "language_breakdown";
 
 export type JobStatus = "queued" | "dispatched" | "running" | "succeeded" | "failed" | "cancelled";
 
@@ -248,16 +248,17 @@ export interface KMeansResult {
   training_cost: number;
   clusters: { cluster: number; size: number; repo_ids: string[]; mean: Record<string, number> }[];
 }
-export interface LogRegResult {
-  label: string;
-  n_train: number;
-  n_test: number;
-  positive_rate: number;
-  accuracy: number;
-  auc: number;
-  features: string[];
-  coefficients: number[];
-  intercept: number;
+export interface RepoLanguages {
+  result: LanguagesResult | null;
+  job_id: string | null;
+  finished_at: string | null;
+}
+export interface LanguagesResult {
+  total_bytes: number;
+  total_files: number;
+  repos: number;
+  languages: { language: string; bytes: number; files: number; share: number }[];
+  top_files: { name: string; count: number; share: number }[];
 }
 
 export interface Ready {

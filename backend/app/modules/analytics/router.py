@@ -99,6 +99,22 @@ async def get_results(job_id: str, auth: AuthUser = Depends(current_user), ctx: 
     return {"job_id": job["id"], "task_type": job["task_type"], "result": job["result"], "metrics": job["metrics"]}
 
 
+@router.get("/repositories/{repo_id}/languages")
+async def repo_languages(repo_id: str, auth: AuthUser = Depends(current_user),
+                         ctx: Context = Depends(get_ctx)):
+    """The most recent language breakdown computed for THIS repository alone.
+
+    A job covering several repositories stores its aggregate against each of them, which would be a
+    lie on a single repository's page, so only a single-repository run counts here.
+    """
+    repo, _ = await require(ctx, auth.id, repo_id, "reader", need_storage=False)
+    for r in await ctx.store.list_repo_results(repo["id"], 20):
+        summary = r["summary"] or {}
+        if r["task_type"] == "language_breakdown" and summary.get("repos") == 1:
+            return {"result": summary, "job_id": r["job_id"], "finished_at": r["finished_at"]}
+    return {"result": None, "job_id": None, "finished_at": None}
+
+
 @router.post("/jobs/{job_id}/cancel")
 async def cancel(job_id: str, auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
     job = await _own_job(ctx, auth, job_id)
