@@ -130,7 +130,7 @@ const flowchartHtml = `<!DOCTYPE html>
     flex-shrink: 0;
   }
   .node-title {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
@@ -146,8 +146,7 @@ const flowchartHtml = `<!DOCTYPE html>
     line-height: 1.35;
   }
 
-  /* Specific Nodes in Top Row */
-  /* User: left 10, width 85 */
+  /* Top Row Positions */
   .node-user {
     left: 10px;
     top: 25px;
@@ -170,39 +169,36 @@ const flowchartHtml = `<!DOCTYPE html>
     margin-bottom: 6px;
   }
 
-  /* Frontend: left 175, width 185 */
   .node-frontend {
-    left: 175px;
+    left: 185px;
     top: 25px;
-    width: 185px;
+    width: 175px;
     height: 115px;
   }
 
-  /* Backend: left 450, width 210 */
   .node-backend {
-    left: 450px;
+    left: 470px;
     top: 20px;
-    width: 210px;
+    width: 195px;
     height: 125px;
     background: #f8fafc;
     border: 2px solid #0f172a;
   }
 
-  /* Storage: left 755, width 255 */
   .node-astra {
-    left: 755px;
+    left: 770px;
     top: 15px;
-    width: 255px;
+    width: 240px;
     height: 90px;
   }
   .node-git {
-    left: 755px;
+    left: 770px;
     top: 120px;
-    width: 255px;
+    width: 240px;
     height: 90px;
   }
 
-  /* Analytics Pipeline: top 265, height 245 */
+  /* Analytics Pipeline */
   .pipeline-container {
     position: absolute;
     left: 10px;
@@ -263,7 +259,7 @@ const flowchartHtml = `<!DOCTYPE html>
     border-radius: 4px;
   }
 
-  /* Optional Services: top 585, height 175 */
+  /* Optional Services */
   .optional-container {
     position: absolute;
     left: 10px;
@@ -312,34 +308,37 @@ const flowchartHtml = `<!DOCTYPE html>
     justify-content: center;
   }
 
-  /* Floating Wire Label Pill */
+  /* Floating Wire Label Pill (Centered & Clear) */
   .wire-pill {
     position: absolute;
     background: #ffffff;
-    border: 1px solid #334155;
-    padding: 2px 7px;
-    border-radius: 4px;
+    border: 1.5px solid #0f172a;
+    padding: 3px 8px;
+    border-radius: 5px;
     font-size: 9.5px;
     font-weight: 750;
     color: #0f172a;
     white-space: nowrap;
     z-index: 3;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
     transform: translate(-50%, -50%);
+    text-align: center;
+    line-height: 1.25;
   }
   .wire-pill-dashed {
     position: absolute;
     background: #ffffff;
-    border: 1px dashed #64748b;
-    padding: 2px 6px;
+    border: 1px dashed #475569;
+    padding: 2px 7px;
     border-radius: 4px;
     font-size: 9px;
     font-weight: 700;
-    color: #475569;
+    color: #334155;
     white-space: nowrap;
     z-index: 3;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     transform: translate(-50%, -50%);
+    text-align: center;
   }
 
   /* Bottom Legend & Caption */
@@ -439,65 +438,60 @@ const flowchartHtml = `<!DOCTYPE html>
       </defs>
 
       <!-- 1. User -> Frontend (Solid) -->
-      <!-- User right: 95, Frontend left: 175. Gap is 80px -->
-      <line x1="95" y1="82" x2="175" y2="82" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
+      <!-- User right: 95, Frontend left: 185. Gap: 90px -->
+      <line x1="95" y1="82" x2="185" y2="82" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
 
       <!-- 2. Frontend <-> Backend (Bidirectional Solid) -->
-      <!-- Frontend right: 360, Backend left: 450. Gap is 90px -->
-      <line x1="360" y1="82" x2="450" y2="82" stroke="#0f172a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+      <!-- Frontend right: 360, Backend left: 470. Gap: 110px -->
+      <line x1="360" y1="82" x2="470" y2="82" stroke="#0f172a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
 
       <!-- 3. Backend <-> Astra DB (Bidirectional Solid) -->
-      <!-- Backend right: 660, Astra left: 755. Gap is 95px -->
-      <line x1="660" y1="60" x2="755" y2="60" stroke="#0f172a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+      <!-- Backend right: 665, Astra left: 770. Gap: 105px -->
+      <line x1="665" y1="60" x2="770" y2="60" stroke="#0f172a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
 
       <!-- 4. Backend <-> Git Storage (Bidirectional Solid) -->
-      <!-- Backend right: 660, Git left: 755. Gap is 95px -->
-      <line x1="660" y1="105" x2="755" y2="150" stroke="#0f172a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+      <!-- Backend right: 665, Git left: 770. Gap: 105px -->
+      <line x1="665" y1="105" x2="770" y2="150" stroke="#0f172a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
 
       <!-- 5. Backend -> Data Preparation (Downward Solid) -->
-      <!-- Backend bottom: 145, Data Prep top: 310 -->
-      <!-- Data Prep center is around x: 390 -->
-      <line x1="510" y1="145" x2="510" y2="265" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
+      <!-- Backend bottom: 145, Data Prep top: 265. Gap: 120px -->
+      <line x1="520" y1="145" x2="520" y2="265" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
 
       <!-- 6. Analytics Results -> Backend (Upward Solid) -->
-      <!-- Analytics Results center is around x: 880, Backend right bottom: x: 600 -->
-      <line x1="600" y1="265" x2="600" y2="145" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
+      <line x1="615" y1="265" x2="615" y2="145" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
 
       <!-- 7. Intra-Pipeline Flow (Horizontal Arrows between 4 stages) -->
-      <!-- Stage 1 (left 28, width 222 -> right 250) -> Stage 2 (left 272) -->
       <line x1="250" y1="395" x2="272" y2="395" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
-      <!-- Stage 2 (left 272, width 222 -> right 494) -> Stage 3 (left 516) -->
       <line x1="494" y1="395" x2="516" y2="395" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
-      <!-- Stage 3 (left 516, width 222 -> right 738) -> Stage 4 (left 760) -->
       <line x1="738" y1="395" x2="760" y2="395" stroke="#0f172a" stroke-width="2" marker-end="url(#arrow)" />
 
       <!-- 8. Optional Dashed Integrations -->
-      <!-- Cloudinary (center x: 180, top: 640) -> Next.js (center x: 267, bottom: 140) -->
-      <path d="M 230 640 L 230 140" fill="none" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
+      <!-- Cloudinary -> Next.js (Upward Dashed) -->
+      <line x1="235" y1="620" x2="235" y2="140" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
       
-      <!-- Cloudinary -> User (center x: 52, bottom: 140) -->
-      <path d="M 125 670 L 52 670 L 52 140" fill="none" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
+      <!-- Cloudinary -> User (Leaves top of card, runs through gap to User) -->
+      <path d="M 110 620 L 110 550 L 52 550 L 52 140" fill="none" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
 
-      <!-- Cloudflare R2 (center x: 510, top: 640) -> Data Preparation (center x: 383, bottom: 510) -->
-      <line x1="510" y1="640" x2="510" y2="510" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
+      <!-- Cloudflare R2 -> Data Preparation (Upward Dashed) -->
+      <line x1="510" y1="620" x2="510" y2="510" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
 
-      <!-- Colab Worker (center x: 840, top: 640) -> Apache Spark (center x: 627, bottom: 510) -->
-      <line x1="770" y1="640" x2="680" y2="510" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
+      <!-- Colab Worker -> Apache Spark (Upward Dashed) -->
+      <line x1="775" y1="620" x2="680" y2="510" stroke="#475569" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)" />
     </svg>
 
-    <!-- Wire Labels (Placed in Center of Gaps) -->
-    <div class="wire-pill" style="left: 135px; top: 62px;">User interaction</div>
-    <div class="wire-pill" style="left: 405px; top: 62px;">HTTP API requests / responses</div>
-    <div class="wire-pill" style="left: 707px; top: 44px;">Metadata reads / writes</div>
-    <div class="wire-pill" style="left: 707px; top: 124px;">Native Git operations</div>
+    <!-- Wire Labels Centered in Gaps -->
+    <div class="wire-pill" style="left: 140px; top: 62px;">User interaction</div>
+    <div class="wire-pill" style="left: 415px; top: 60px;">HTTP API<br>requests / responses</div>
+    <div class="wire-pill" style="left: 717px; top: 44px;">Metadata<br>reads / writes</div>
+    <div class="wire-pill" style="left: 717px; top: 124px;">Native Git<br>operations</div>
     
-    <div class="wire-pill" style="left: 460px; top: 205px;">Activity data export</div>
-    <div class="wire-pill" style="left: 650px; top: 205px;">Metrics / results</div>
+    <div class="wire-pill" style="left: 450px; top: 205px;">Activity data<br>export / retrieval</div>
+    <div class="wire-pill" style="left: 675px; top: 205px;">Metrics / results</div>
 
-    <div class="wire-pill-dashed" style="left: 230px; top: 545px;">Image delivery</div>
-    <div class="wire-pill-dashed" style="left: 52px; top: 400px;">Image requests (avatars)</div>
-    <div class="wire-pill-dashed" style="left: 510px; top: 545px;">Object transfer (archives / exports)</div>
-    <div class="wire-pill-dashed" style="left: 745px; top: 545px;">Remote Spark execution</div>
+    <div class="wire-pill-dashed" style="left: 80px; top: 550px;">Image requests (avatars)</div>
+    <div class="wire-pill-dashed" style="left: 235px; top: 550px;">Image delivery</div>
+    <div class="wire-pill-dashed" style="left: 510px; top: 550px;">Object transfer (archives / exports)</div>
+    <div class="wire-pill-dashed" style="left: 745px; top: 550px;">Remote Spark execution</div>
 
     <!-- 1. User Node -->
     <div class="node-card node-user">
@@ -743,7 +737,7 @@ const flowchartHtml = `<!DOCTYPE html>
     deviceScaleFactor: 1, // exact 1080x1080 pixel PNG output
   });
 
-  console.log('Rendering refined 1080x1080 System Architecture Flowchart...');
+  console.log('Rendering clean 1080x1080 System Architecture Flowchart...');
   await page.setContent(flowchartHtml, { waitUntil: 'networkidle' });
   const outPath = path.join(imagesDir, 'system-architecture-flowchart.png');
   const canvas = await page.$('.canvas');
