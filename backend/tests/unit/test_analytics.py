@@ -436,3 +436,10 @@ def test_a_survey_in_flight_blocks_another_and_its_result_is_shares_only(client,
 
     assert set(body["result"]) == {"languages", "visibility", "message_lengths"}
     assert set(body["result"]["visibility"][0]) == {"label", "share"}   # no count, and no totals
+
+    # and the same run's metrics: rows is the repository count the result just stopped reporting
+    metrics = {"duration_s": 3.0, "rows": 9, "worker_id": "colab-box-1", "wall_s": 4.0}
+    asyncio.run(store.update_job(jid, metrics=metrics))
+    for path in (f"{API}/analytics/jobs/{jid}", f"{API}/analytics/jobs/{jid}/results"):
+        out = client.get(path, headers=h).json()["metrics"]
+        assert out == {"duration_s": 3.0, "wall_s": 4.0}

@@ -73,9 +73,25 @@ class JobCreate(BaseModel):
         return parse_uuid(v, "job id") if v else v
 
 
+# What a global run's reader may see of how it went: how long it took, and nothing it measured.
+SURVEY_METRICS = ("duration_s", "queue_wait_s", "wall_s", "spark_version")
+
+
+def survey_metrics(metrics: dict | None) -> dict:
+    """Timing only.
+
+    `rows` is that run's repository count - the very figure survey_shares drops from the result, so
+    leaving it in the metrics would hand back what the result no longer says. `worker_id` names a
+    machine, which is nobody's business but the operator's.
+    """
+    return {k: v for k, v in (metrics or {}).items() if k in SURVEY_METRICS}
+
+
 def job_out(job: dict, worker_available: bool | None = None) -> dict:
     out = {k: job[k] for k in ("id", "task_type", "params", "repo_ids", "status", "attempts", "error",
                                "metrics", "created_at", "updated_at", "started_at", "finished_at")}
+    if job["task_type"] in GLOBAL_TASKS:  # every route that returns a job comes through here
+        out["metrics"] = survey_metrics(out["metrics"])
     if worker_available is not None and job["status"] == "queued":
         out["worker_available"] = worker_available
         if not worker_available:
@@ -144,8 +160,10 @@ async def get_results(job_id: str, auth: AuthUser = Depends(current_user), ctx: 
         raise Conflict(f"Job is {job['status']}", code="results_not_ready")
     # A global run is the platform's, not the submitter's. Handing its raw counts back here would
     # keep an old run exact long after /survey has moved on - the pair you need to subtract.
-    result = survey_shares(job["result"]) if job["task_type"] in GLOBAL_TASKS else job["result"]
-    return {"job_id": job["id"], "task_type": job["task_type"], "result": result, "metrics": job["metrics"]}
+    is_global = job["task_type"] in GLOBAL_TASKS
+    return {"job_id": job["id"], "task_type": job["task_type"],
+            "result": survey_shares(job["result"]) if is_global else job["result"],
+            "metrics": survey_metrics(job["metrics"]) if is_global else job["metrics"]}
 
 
 @router.get("/repositories/{repo_id}/languages")
