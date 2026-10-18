@@ -9,6 +9,12 @@ import { ActivityFeed } from "@/components/activity/feed";
 import { CommitActivityChart } from "@/components/activity/commit-chart";
 import { EmptyState, ErrorState, PageHeader, SkeletonRows } from "@/components/ui/states";
 
+const SOURCES = [
+  { value: "all", label: "All activity" },
+  { value: "gitarchy", label: "Exclude GitHub imports" },
+  { value: "github", label: "GitHub imports only" },
+];
+
 const TYPES = [
   { value: "all", label: "Everything" },
   { value: "commit.created", label: "Commits" },
@@ -24,19 +30,40 @@ export function MyActivity() {
   const repos = useRepos();
   const [type, setType] = useState("all");
   const [repo, setRepo] = useState("all");
+  const [source, setSource] = useState("all");
   const name = useMemo(() => {
     const m = new Map((repos.data ?? []).map((r) => [r.id, r.name]));
     return (id: string) => m.get(id);
   }, [repos.data]);
+  // Repositories pulled in from GitHub carry their "owner/name" there as `source`.
+  const fromGitHub = useMemo(() => {
+    const m = new Map((repos.data ?? []).map((r) => [r.id, r.source != null]));
+    return (id: string) => m.get(id) ?? false;
+  }, [repos.data]);
 
-  const inRepo = (activity.data ?? []).filter((e) => repo === "all" || e.repo_id === repo);
+  const inRepo = (activity.data ?? []).filter(
+    (e) =>
+      (repo === "all" || e.repo_id === repo) &&
+      (source === "all" || fromGitHub(e.repo_id) === (source === "github")),
+  );
   const events = inRepo.filter(
     (e) => type === "all" || (type === "member" ? e.type.startsWith("member.") : e.type === type),
   );
 
   return (
     <div className="mx-auto max-w-[78rem]">
-      <PageHeader title="Activity" description="What you've done across Gitarchy, and notices addressed to you." />
+      <PageHeader
+        title="Activity"
+        description="What you've done across Gitarchy, and notices addressed to you."
+        actions={
+          <>
+            <label htmlFor="act-source" className="text-xs text-fg-2">Show</label>
+            <select id="act-source" className="select h-8 w-auto text-xs" value={source} onChange={(e) => setSource(e.target.value)}>
+              {SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </>
+        }
+      />
       <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section aria-labelledby="feed-h" className="min-w-0">
           {activity.isSuccess && activity.data.length ? (
