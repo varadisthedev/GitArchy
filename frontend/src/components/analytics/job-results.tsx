@@ -194,7 +194,8 @@ function Languages({ r }: { r: LanguagesResult }) {
         <p className="mt-3 max-w-[70ch] text-xs text-fg-2">
           Share of {n(r.total_files)} files across {r.repos === 1 ? "this repository" : `${n(r.repos)} repositories`},
           measured in bytes of the current tree rather than files changed — so it reflects what the code is, not what
-          was edited recently. Extensions this server doesn&apos;t recognise count as Other rather than being guessed at.
+          was edited recently. Images, fonts and other carried assets are named as what they are; only unrecognised
+          extensions and dotfiles count as Other.
         </p>
       </section>
       <ChartFrame

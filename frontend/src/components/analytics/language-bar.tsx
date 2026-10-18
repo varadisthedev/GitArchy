@@ -25,6 +25,10 @@ const COLORS: Record<string, string> = {
   SQL: "#e38c00", "Jupyter Notebook": "#da5b0b", Dockerfile: "#384d54", Makefile: "#427819",
   CMake: "#da3434", Gradle: "#02303a", Terraform: "#844fba", "Protocol Buffers": "#c1cdd4",
   "Vim Script": "#199f4b", Other: "var(--fg-4)",
+  // Assets are not code. Muted greys on purpose, so bytes of PNG never read as a language.
+  Images: "#7d7572", Fonts: "#6e6866", Video: "#8a807c", Audio: "#79716e", Archives: "#655f5d",
+  Documents: "#6b6462", Data: "#847a76", Binaries: "#5c5755", Text: "#736c6a",
+  "Source maps": "#605a58", Lockfiles: "#574f4d", Config: "#6a625f",
 };
 
 /** Stable per-name hue, so an unnamed language keeps the same colour between runs and views. */
@@ -39,10 +43,34 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 const bytes = (v: number) =>
   v < 1024 ? `${v} B` : v < 1024 ** 2 ? `${(v / 1024).toFixed(1)} KB` : `${(v / 1024 ** 2).toFixed(1)} MB`;
 
-export function LanguageBar({ languages, totalBytes }: { languages: LanguagesResult["languages"]; totalBytes: number }) {
-  const big = languages.filter((l) => l.share >= MIN_SHARE);
-  const restShare = languages.filter((l) => l.share < MIN_SHARE).reduce((s, l) => s + l.share, 0);
-  const shown = restShare > 0 ? [...big, { language: "Other", bytes: Math.round(restShare * totalBytes), files: 0, share: restShare }] : big;
+type Lang = LanguagesResult["languages"][number];
+
+/**
+ * Everything under MIN_SHARE folds into one "Other", which always sorts last.
+ *
+ * The server emits its own "Other" bucket for extensions it cannot name, so the tail must merge INTO
+ * that bucket rather than be appended beside it - two entries called "Other" is both a wrong legend
+ * and a duplicate React key.
+ */
+export function foldLanguages(languages: Lang[]): Lang[] {
+  const shown: Lang[] = [];
+  const other: Lang = { language: "Other", bytes: 0, files: 0, share: 0 };
+  let folded = false;
+  for (const l of languages) {
+    if (l.language !== "Other" && l.share >= MIN_SHARE) {
+      shown.push(l);
+      continue;
+    }
+    other.bytes += l.bytes;
+    other.files += l.files;
+    other.share += l.share;
+    folded = true;
+  }
+  return folded ? [...shown, other] : shown;
+}
+
+export function LanguageBar({ languages }: { languages: Lang[]; totalBytes?: number }) {
+  const shown = foldLanguages(languages);
 
   return (
     <div>
