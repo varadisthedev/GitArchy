@@ -22,6 +22,14 @@ async def tree(repo_id: str, ref: str | None = Query(None, max_length=100), path
     return await ctx.git.tree(repo["id"], ref or repo["default_branch"], path)
 
 
+@router.get("/search", dependencies=[Depends(limit_user("search"))])
+async def search(repo_id: str, q: str = Query(..., max_length=200), ref: str | None = Query(None, max_length=100),
+                 path: str = Query("", max_length=400),
+                 auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
+    repo, _ = await require(ctx, auth.id, repo_id, "reader")
+    return await ctx.git.search(repo["id"], ref or repo["default_branch"], q, path or None)
+
+
 @router.get("/files")
 async def read_file(repo_id: str, path: str = Query(..., max_length=400), ref: str | None = Query(None, max_length=100),
                     auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):

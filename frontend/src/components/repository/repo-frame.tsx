@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, ChartNoAxesColumn, FileCode2, GitBranch, GitCommitHorizontal, Settings } from "lucide-react";
+import { Activity, ChartNoAxesColumn, FileCode2, GitBranch, GitCommitHorizontal, Search, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -57,6 +57,7 @@ function RepoTabs({ id }: { id: string }) {
   const base = `/repositories/${id}`;
   const tabs = [
     { href: base, label: "Code", icon: FileCode2, on: ["", "blob", "edit"].includes(sub) },
+    { href: `${base}/search`, label: "Search", icon: Search, on: sub === "search" },
     { href: `${base}/commits`, label: "Commits", icon: GitCommitHorizontal, on: sub === "commits" || sub === "compare" },
     { href: `${base}/branches`, label: "Branches", icon: GitBranch, on: sub === "branches" },
     { href: `${base}/activity`, label: "Activity", icon: Activity, on: sub === "activity" },

@@ -14,6 +14,8 @@ export const treeHref = (id: string, ref: string, path = "") => `/repositories/$
 export const blobHref = (id: string, ref: string, path: string) => `/repositories/${id}/blob${q({ ref, path })}`;
 export const editHref = (id: string, ref: string, path: string) => `/repositories/${id}/edit${q({ ref, path })}`;
 export const newFileHref = (id: string, ref: string, dir = "") => `/repositories/${id}/edit${q({ ref, dir, new: "1" })}`;
+export const searchHref = (id: string, ref: string, needle = "", path = "") =>
+  `/repositories/${id}/search${q({ ref, q: needle, path })}`;
 export const commitsHref = (id: string, ref: string, path = "") => `/repositories/${id}/commits${q({ ref, path })}`;
 export const commitHref = (id: string, sha: string) => `/repositories/${id}/commits/${sha}`;
 

@@ -2,7 +2,7 @@
 
 import {
   Activity, ArrowLeft, BookMarked, ChartNoAxesColumn, CloudDownload, FileCode2, GitBranch,
-  GitCommitHorizontal, Globe2, LayoutDashboard, Settings, type LucideIcon,
+  GitCommitHorizontal, Globe2, LayoutDashboard, Search, Settings, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -27,6 +27,7 @@ function repoItems(id: string): Item[] {
   const sub = (p: string) => p.match(REPO_RE)?.[2] ?? "";
   return [
     { href: base, label: "Code", icon: FileCode2, match: (p) => ["", "blob", "edit"].includes(sub(p)) },
+    { href: `${base}/search`, label: "Search", icon: Search, match: (p) => sub(p) === "search" },
     { href: `${base}/commits`, label: "Commits", icon: GitCommitHorizontal, match: (p) => ["commits", "compare"].includes(sub(p)) },
     { href: `${base}/branches`, label: "Branches", icon: GitBranch, match: (p) => sub(p) === "branches" },
     { href: `${base}/activity`, label: "Activity", icon: Activity, match: (p) => sub(p) === "activity" },

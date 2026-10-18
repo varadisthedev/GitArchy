@@ -75,6 +75,22 @@ export interface FileBlob {
   is_symlink: boolean;
 }
 
+export interface SearchHit {
+  path: string;
+  line: number;
+  text: string;
+  clipped: boolean;
+}
+
+export interface SearchResults {
+  ref: string;
+  commit: string;
+  query: string;
+  path: string;
+  hits: SearchHit[];
+  truncated: boolean;
+}
+
 export interface Commit {
   sha: string;
   author_name: string;

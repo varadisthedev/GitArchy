@@ -167,3 +167,29 @@ def test_missing_storage_reports_503_not_500(client, alice, settings):
     r = client.get(f"{API}/repositories/{rid}/tree", headers=h)
     assert r.status_code == 503 and r.json()["error"]["code"] == "repo_storage_unavailable"
     assert client.get(f"{API}/repositories/{rid}", headers=h).status_code == 200  # metadata still served
+
+
+def test_search_finds_matches_and_respects_access(client, alice, bob):
+    _, h = alice
+    _, hb = bob
+    rid = mk_repo(client, h, name="searchable", visibility="private")["id"]
+    assert commit(client, h, rid, "src/app.py", "def handler():\n    return TOKEN_value\n").status_code == 201
+    assert commit(client, h, rid, "docs/notes.md", "nothing here\n").status_code == 201
+
+    r = client.get(f"{API}/repositories/{rid}/search", headers=h, params={"q": "token_value"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [(x["path"], x["line"], x["text"]) for x in body["hits"]] == [("src/app.py", 2, "    return TOKEN_value")]
+    assert not body["truncated"] and body["query"] == "token_value"
+
+    # no match is an answer, not an error; and the path filter narrows it
+    assert client.get(f"{API}/repositories/{rid}/search", headers=h, params={"q": "zzznope"}).json()["hits"] == []
+    assert client.get(f"{API}/repositories/{rid}/search", headers=h,
+                      params={"q": "nothing", "path": "src"}).json()["hits"] == []
+
+    # a regex metacharacter is a literal, not a pattern
+    assert client.get(f"{API}/repositories/{rid}/search", headers=h, params={"q": ".*"}).json()["hits"] == []
+
+    # too short, and a non-member sees the private repo as absent
+    assert client.get(f"{API}/repositories/{rid}/search", headers=h, params={"q": "x"}).status_code == 422
+    assert client.get(f"{API}/repositories/{rid}/search", headers=hb, params={"q": "token"}).status_code == 404

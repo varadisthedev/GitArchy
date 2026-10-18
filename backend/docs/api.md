@@ -40,6 +40,7 @@ analytics / a Spark worker are configured/connected - it never calls Spark).
 | POST | `/repositories/{id}/branches` | writer | `{name, from_ref?}` (default branch if omitted). 409 `branch_exists` |
 | GET | `/repositories/{id}/tree?ref=&path=` | reader | `entries[{name,type: file\|dir\|symlink\|submodule,mode,sha,size}]` |
 | GET | `/repositories/{id}/files?path=&ref=` | reader | `{content, encoding: utf-8\|base64, size, commit, is_symlink}`; 413 over `GIT_MAX_FILE_BYTES`. `ref` = branch or hex commit id |
+| GET | `/repositories/{id}/search?q=&ref=&path=` | reader | `git grep`: literal, case-insensitive, text files only. `{hits[{path,line,text,clipped}], truncated}`; 20 matches per file, 100 in total. `q` is 2-200 chars |
 | POST | `/repositories/{id}/commits` | writer | `{branch, message, changes:[{path, content, encoding?} \| {path, delete:true}], expected_parent?}` -> `{sha, branch}`. Text is stored byte-exact. 409 `stale_parent` / `path_conflict`; 422 `nothing_to_commit` |
 | GET | `/repositories/{id}/commits?ref=&path=&limit=&skip=` | reader | |
 | GET | `/repositories/{id}/diff?base=&head=&path=` | reader | `{files[{path,additions,deletions,binary}], patch, truncated}` (capped by `GIT_MAX_DIFF_BYTES`) |

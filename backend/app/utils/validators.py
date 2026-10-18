@@ -44,6 +44,17 @@ def validate_ref(ref: str) -> str:
     return validate_branch(ref)
 
 
+MAX_QUERY_LEN = 200
+
+
+def validate_query(q: str) -> str:
+    """A literal search needle: printable, trimmed, never passed to a regex engine."""
+    q = q.strip()
+    if not 2 <= len(q) <= MAX_QUERY_LEN or any(ord(c) < 32 for c in q):
+        raise InvalidInput(f"Search query must be 2-{MAX_QUERY_LEN} characters")
+    return q
+
+
 def validate_path(path: str, allow_empty: bool = False) -> str:
     """Normalised repo-relative POSIX path. Rejects traversal, absolute, backslash, NUL, '.git' components."""
     if path in ("", "/") and allow_empty:

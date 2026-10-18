@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, API_BASE, COLD_START_TIMEOUT_MS } from "./client";
 import type {
-  ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, GithubCallbackResult, GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, RepoLanguages, Survey, TaskType, Tree, User, Visibility,
+  ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, GithubCallbackResult, GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, RepoLanguages, SearchResults, Survey, TaskType, Tree, User, Visibility,
 } from "./types";
 
 // Keys are hierarchical so one invalidate(["repo", id]) refreshes everything under a repository.
@@ -16,6 +16,7 @@ export const qk = {
   branches: (id: string) => ["repo", id, "branches"] as const,
   tree: (id: string, ref: string, path: string) => ["repo", id, "tree", ref, path] as const,
   file: (id: string, ref: string, path: string) => ["repo", id, "file", ref, path] as const,
+  search: (id: string, ref: string, q: string, path: string) => ["repo", id, "search", ref, q, path] as const,
   commits: (id: string, ref: string, path: string, skip: number) => ["repo", id, "commits", ref, path, skip] as const,
   commit: (id: string, sha: string) => ["repo", id, "commit", sha] as const,
   diff: (id: string, base: string, head: string) => ["repo", id, "diff", base, head] as const,
@@ -82,6 +83,15 @@ export const useFile = (id: string, ref: string, path: string, enabled = true) =
     queryKey: qk.file(id, ref, path),
     queryFn: ({ signal }) => api<FileBlob>(`/repositories/${id}/files`, { signal, query: { ref, path } }),
     enabled: enabled && !!ref && !!path,
+  });
+
+/** Literal, case-insensitive content search at `ref`. Capped server-side. */
+export const useSearch = (id: string, ref: string, q: string, path = "") =>
+  useQuery({
+    queryKey: qk.search(id, ref, q, path),
+    queryFn: ({ signal }) => api<SearchResults>(`/repositories/${id}/search`, { signal, query: { q, ref, path } }),
+    enabled: !!ref && q.trim().length >= 2,
+    staleTime: 30_000,
   });
 
 export const COMMIT_PAGE = 30;

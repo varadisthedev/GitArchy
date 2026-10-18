@@ -92,6 +92,7 @@ class Settings(BaseSettings):
     rl_repo_create: str = "20/hour"
     rl_repo_delete: str = "20/hour"
     rl_commit: str = "60/minute"
+    rl_search: str = "30/minute"
     rl_upload: str = "20/hour"
     rl_analytics_submit: str = "10/hour"
     rl_github_oauth: str = "20/hour"

@@ -21,12 +21,14 @@ from pathlib import Path
 from app.core.config import Settings
 from app.core.exceptions import AppError, Conflict, NotFound, PayloadTooLarge
 from app.integrations.git.storage import LocalRepositoryStorage
-from app.utils.validators import InvalidInput, validate_branch, validate_path, validate_ref
+from app.utils.validators import InvalidInput, validate_branch, validate_path, validate_query, validate_ref
 
 log = logging.getLogger("gitarchey.git")
 
 ZERO_SHA = "0" * 40
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
+# search caps: matches per file, matches in total, characters of a matched line
+SEARCH_PER_FILE, SEARCH_MAX_HITS, SEARCH_MAX_LINE = 20, 100, 300
 
 
 class GitError(AppError):
@@ -291,6 +293,37 @@ class GitManager:
             i += 1
         return {"base": a, "head": b, "files": files, "patch": patch.decode("utf-8", "replace"),
                 "truncated": truncated}
+
+    async def search(self, repo_id: str, ref: str, query: str, path: str | None = None) -> dict:
+        """Fixed-string, case-insensitive content search at `ref` (`git grep`). Text files only.
+
+        Caps are per file and overall, so one pathological query cannot return the whole repository.
+        """
+        query = validate_query(query)
+        sha = await self.resolve(repo_id, ref)
+        args = ["grep", "--no-color", "-I", "-n", "-z", "--fixed-strings", "--ignore-case",
+                f"-m{SEARCH_PER_FILE}", "-e", query, "--end-of-options", sha]
+        if path:
+            args += ["--", validate_path(path)]
+        r = await self._run(repo_id, args)
+        if r.rc not in (0, 1):  # 1 = no match, which is an answer and not a failure
+            raise self._fail("grep", r)
+        prefix = f"{sha}:".encode()
+        hits, truncated = [], False
+        for rec in r.out.split(b"\n"):
+            if not rec.startswith(prefix):
+                continue
+            parts = rec[len(prefix):].split(b"\x00", 2)
+            if len(parts) != 3 or not parts[1].isdigit():
+                continue
+            if len(hits) >= SEARCH_MAX_HITS:
+                truncated = True
+                break
+            text = parts[2].decode("utf-8", "replace")
+            hits.append({"path": parts[0].decode("utf-8", "replace"), "line": int(parts[1]),
+                         "text": text[:SEARCH_MAX_LINE], "clipped": len(text) > SEARCH_MAX_LINE})
+        return {"ref": ref, "commit": sha, "query": query, "path": path or "",
+                "hits": hits, "truncated": truncated}
 
     async def analytics_log(self, repo_id: str, ref: str, max_rows: int) -> list[dict]:
         """Commit rows with per-commit numstat totals, for analytics datasets (bounded)."""
