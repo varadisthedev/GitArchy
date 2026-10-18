@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.api.dependencies import AuthUser, Context, authenticate_token, current_user, get_ctx, limit_user
 from app.core.exceptions import AppError, Conflict, NotFound, Unavailable
 from app.integrations.astra.memory import utcnow
+from app.integrations.spark.job_manager import QuotaExceeded
 from app.integrations.spark.protocol import GLOBAL_TASKS, TASKS, TERMINAL, TaskType
 from app.modules.analytics.datasets import default_repo_ids
 from app.modules.repositories.access import require
@@ -16,6 +17,38 @@ from app.utils.validators import InvalidInput, parse_uuid
 log = logging.getLogger("gitarchey.analytics")
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 SURVEY_HISTORY = 24  # runs charted on /survey; a survey is a manual act, so this is months of them
+SURVEY_MIN_INTERVAL_S = 6 * 3600
+
+
+def survey_shares(result: dict) -> dict:
+    """A past run, as the shares a chart needs and nothing else.
+
+    Counts are what make two runs subtractable. "private: 7" beside "private: 8" an hour later names
+    the hour a private repository appeared, and the language counts beside them say what is in it.
+    The newest run still carries its totals - they are the page's headline - but one set of current
+    figures cannot be differenced against anything.
+    """
+    return {k: [{"label": g["label"], "share": g["share"]} for g in result.get(k) or []]
+            for k in ("languages", "visibility", "message_lengths")}
+
+
+async def survey_cooldown(ctx: Context) -> None:
+    """Space survey runs out once private repositories are inside them.
+
+    SURVEY_MIN_ACCOUNTS makes any one result safe to publish. It says nothing about the difference
+    between two, and a caller who can measure whenever they like can bracket somebody else's
+    afternoon and read the change straight off the delta. Below the floor the survey is public data
+    only, so there is nothing a delta could disclose and no reason to make anyone wait.
+    """
+    newest = await ctx.store.get_survey()
+    if not newest:
+        return
+    private = any(g["label"] != "public" and g["count"] > 0
+                  for g in newest["result"].get("visibility") or [])
+    waited = (utcnow() - newest["measured_at"]).total_seconds()
+    if private and waited < SURVEY_MIN_INTERVAL_S:
+        raise QuotaExceeded(f"The survey can run again in "
+                            f"{int((SURVEY_MIN_INTERVAL_S - waited) // 60) + 1} minutes")
 
 
 class JobCreate(BaseModel):
@@ -68,6 +101,7 @@ async def submit(body: JobCreate, auth: AuthUser = Depends(current_user), ctx: C
     except Exception:
         raise InvalidInput(f"Invalid params for {body.task_type}") from None
     if body.task_type in GLOBAL_TASKS:
+        await survey_cooldown(ctx)
         # platform-wide scope. There is no repository list to authorise against, and none is needed:
         # the dataset is aggregate-only, so the result cannot disclose a repository to anyone.
         # Params are the server's, not the caller's: this result is cached and served to every other
@@ -138,7 +172,7 @@ async def survey(auth: AuthUser = Depends(current_user), ctx: Context = Depends(
             "job_id": newest["job_id"] if newest else None,
             "measured_at": newest["measured_at"] if newest else None,
             # oldest first: the shape a chart reads left to right
-            "history": [{"measured_at": r["measured_at"], "result": r["result"]} for r in reversed(runs)],
+            "history": [{"measured_at": r["measured_at"], **survey_shares(r["result"])} for r in reversed(runs)],
             "worker_available": bool(ctx.jobs and ctx.jobs.worker_available)}
 
 

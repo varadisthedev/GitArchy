@@ -359,21 +359,51 @@ async def test_global_concurrency_cap(tmp_path):
     assert sum(1 for w in (a, b) if w.job_id) == 1
 
 
-def test_survey_endpoint_serves_the_history_oldest_first(client, alice):
+def _save_survey(client, n, private=0):
+    store = client.app.state.ctx.store
+    vis = [{"label": "public", "count": n, "share": n / 10}]
+    if private:
+        vis.append({"label": "private", "count": private, "share": private / 10})
+    asyncio.run(store.save_survey(str(uuid.uuid4()), {
+        "accounts": n, "repos": n, "files": n, "commits": n,
+        "languages": [], "visibility": vis, "message_lengths": []}))
+
+
+def test_survey_endpoint_serves_a_shares_only_history_oldest_first(client, alice):
     """The chart reads left to right; the store clusters newest first. One of them has to turn round.
 
-    Also pins the endpoint shape the page depends on, and that it needs a signed-in reader.
+    Past runs carry no counts: two of those can be subtracted for the one repository that changed
+    between them. The newest result keeps its totals - there is nothing to difference it against.
     """
     _, h = alice
-    assert client.get(f"{API}/analytics/survey").status_code == 401
+    assert client.get(f"{API}/analytics/survey").status_code == 401   # not the anonymous web's to read
 
-    store = client.app.state.ctx.store
     for n in (1, 2, 3):
-        asyncio.run(store.save_survey(str(uuid.uuid4()), {"accounts": n, "repos": n, "files": n,
-                                                          "commits": n, "languages": [], "visibility": [],
-                                                          "message_lengths": []}))
+        _save_survey(client, n)
     body = client.get(f"{API}/analytics/survey", headers=h).json()
 
-    assert body["result"]["accounts"] == 3                                  # newest is the headline
-    assert [r["result"]["accounts"] for r in body["history"]] == [1, 2, 3]   # oldest first for the chart
+    assert body["result"]["accounts"] == 3                                        # newest is the headline
+    assert [r["visibility"][0]["share"] for r in body["history"]] == [0.1, 0.2, 0.3]   # oldest first
+    assert set(body["history"][0]) == {"measured_at", "languages", "visibility", "message_lengths"}
+    assert set(body["history"][0]["visibility"][0]) == {"label", "share"}
     assert body["measured_at"] == body["history"][-1]["measured_at"]
+
+
+def test_a_survey_holding_private_repositories_cannot_be_rerun_at_will(client, alice):
+    """One result is safe to publish; the difference between two taken minutes apart is not.
+
+    Without a wait, a caller can bracket somebody else's afternoon and read a private repository
+    appearing straight off the delta. A public-only survey has nothing to protect, so it is free.
+    """
+    _, h = alice
+    submit = lambda: client.post(f"{API}/analytics/jobs", headers=h,  # noqa: E731
+                                 json={"task_type": "platform_survey"})
+
+    assert submit().status_code == 202          # nothing measured yet: nothing to difference against
+
+    _save_survey(client, 3, private=2)
+    r = submit()
+    assert r.status_code == 429 and "can run again in" in r.json()["error"]["message"]
+
+    _save_survey(client, 3)                     # newest run is public-only again
+    assert submit().status_code == 202

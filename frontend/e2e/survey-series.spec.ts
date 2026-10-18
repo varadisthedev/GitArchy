@@ -1,13 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { toSeries } from "../src/app/(app)/survey/platform-survey";
-import type { SurveyResult, SurveyRun } from "../src/lib/api/types";
+import type { SurveyRun, SurveyShare } from "../src/lib/api/types";
 
-const g = (label: string, share: number) => ({ label, share, count: Math.round(share * 100) });
-const run = (measured_at: string, languages: { label: string; share: number; count: number }[]): SurveyRun => ({
-  measured_at,
-  result: { accounts: 1, repos: 1, files: 1, commits: 1, languages, visibility: [], message_lengths: [] } as SurveyResult,
-});
-const langs = (r: SurveyResult) => r.languages;
+const g = (label: string, share: number) => ({ label, share });
+const run = (measured_at: string, languages: SurveyShare[]): SurveyRun =>
+  ({ measured_at, languages, visibility: [], message_lengths: [] });
+const langs = (r: SurveyRun) => r.languages;
 
 test("toSeries orders the stack by the newest run, so the biggest band sits on the floor", () => {
   const { series } = toSeries([

@@ -3,7 +3,7 @@
 import { Globe2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useSubmitJob, useSurvey } from "@/lib/api/queries";
-import type { SurveyGroup, SurveyResult, SurveyRun } from "@/lib/api/types";
+import type { SurveyGroup, SurveyRun, SurveyShare } from "@/lib/api/types";
 import { fullDate, plural, relTime } from "@/lib/format";
 import { ChartFrame, ShareArea } from "@/components/analytics/charts";
 import { colorFor } from "@/components/analytics/language-bar";
@@ -11,7 +11,7 @@ import { EmptyState, ErrorState, PageHeader, SkeletonRows } from "@/components/u
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
-type Pick = (r: SurveyResult) => SurveyGroup[];
+type Pick = (r: SurveyRun) => SurveyShare[];
 
 /**
  * The history as one stacked band per label, oldest run on the left.
@@ -21,11 +21,11 @@ type Pick = (r: SurveyResult) => SurveyGroup[];
  * their share in the newest run, which puts the biggest on the floor of the stack.
  */
 export function toSeries(history: SurveyRun[], pick: Pick) {
-  const latest = new Map(pick(history[history.length - 1].result).map((g) => [g.label, g.share]));
-  const labels = [...new Set(history.flatMap((h) => pick(h.result).map((g) => g.label)))]
+  const latest = new Map(pick(history[history.length - 1]).map((g) => [g.label, g.share]));
+  const labels = [...new Set(history.flatMap((h) => pick(h).map((g) => g.label)))]
     .sort((a, b) => (latest.get(b) ?? 0) - (latest.get(a) ?? 0));
   const data = history.map((h) => {
-    const by = new Map(pick(h.result).map((g) => [g.label, g.share]));
+    const by = new Map(pick(h).map((g) => [g.label, g.share]));
     return Object.fromEntries([["_t", fullDate(h.measured_at)],
       ...labels.map((l) => [l, by.get(l) ?? 0])]) as Record<string, string | number>;
   });
@@ -40,10 +40,9 @@ export function toSeries(history: SurveyRun[], pick: Pick) {
  * the series is of measurements taken, not of months passed, and the first run has nothing to
  * stretch across. Until there are two, the same shares are drawn as the single bar they are.
  */
-function SurveyPanel({ title, caption, history, pick }: {
-  title: string; caption: string; history: SurveyRun[]; pick: Pick;
+function SurveyPanel({ title, caption, groups, history, pick }: {
+  title: string; caption: string; groups: SurveyGroup[]; history: SurveyRun[]; pick: Pick;
 }) {
-  const groups = pick(history[history.length - 1].result);
   const shown = groups.filter((g) => g.count > 0);
   const trend = history.length > 1 ? toSeries(history, pick) : null;
   const range = trend
@@ -97,7 +96,9 @@ export function PlatformSurvey() {
   // a result cached before histories were kept still charts, as the one run it is
   const history: SurveyRun[] = data?.history?.length
     ? data.history
-    : r && data?.measured_at ? [{ measured_at: data.measured_at, result: r }] : [];
+    : r && data?.measured_at
+      ? [{ measured_at: data.measured_at, languages: r.languages, visibility: r.visibility, message_lengths: r.message_lengths }]
+      : [];
 
   const refresh = () => {
     setStarted(true);
@@ -160,6 +161,7 @@ export function PlatformSurvey() {
               <SurveyPanel
                 title="Most popular languages"
                 caption={`Counted by how many of the ${plural(r.files, "file")} carry each extension, not by weight — so a one-line stylesheet counts the same as a trained model.`}
+                groups={r.languages}
                 history={history}
                 pick={(x) => x.languages}
               />
@@ -167,12 +169,14 @@ export function PlatformSurvey() {
             <SurveyPanel
               title="Public or private"
               caption={`Across ${plural(r.repos, "repository", "repositories")}. Counted blind: the survey never records which account owns which repository.`}
+              groups={r.visibility}
               history={history}
               pick={(x) => x.visibility}
             />
             <SurveyPanel
               title="Commit message length"
               caption={`Subject line only, over ${plural(r.commits, "commit")} — a body is not measured. Git convention asks for 50 characters and hard-wraps at 72.`}
+              groups={r.message_lengths}
               history={history}
               pick={(x) => x.message_lengths}
             />

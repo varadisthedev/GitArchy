@@ -264,9 +264,16 @@ export interface SurveyResult {
   visibility: SurveyGroup[];
   message_lengths: SurveyGroup[];
 }
+/** A past run carries shares only — counts are what would let two runs be subtracted. */
+export interface SurveyShare {
+  label: string;
+  share: number;
+}
 export interface SurveyRun {
   measured_at: string;
-  result: SurveyResult;
+  languages: SurveyShare[];
+  visibility: SurveyShare[];
+  message_lengths: SurveyShare[];
 }
 export interface Survey {
   result: SurveyResult | null;
