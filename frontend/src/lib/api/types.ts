@@ -258,7 +258,7 @@ export interface LogRegResult {
 export interface Ready {
   status: "ready" | "not_ready";
   checks: { database: string; git: string };
-  optional: { r2: boolean; cloudinary: boolean; analytics_enabled: boolean; spark_worker_connected: boolean };
+  optional: { r2: "ok" | "off" | "unavailable"; cloudinary: boolean; analytics_enabled: boolean; spark_worker_connected: boolean };
 }
 
 export const RANK: Record<Role, number> = { reader: 1, writer: 2, admin: 3, owner: 4 };

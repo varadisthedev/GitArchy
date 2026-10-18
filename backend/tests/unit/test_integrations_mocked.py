@@ -40,6 +40,10 @@ class FakeS3:
     def delete_object(self, Bucket, Key):
         self.objects.pop(Key, None)
 
+    def head_bucket(self, Bucket):
+        self.calls.append(("head_bucket", Bucket, 0))
+        return {}
+
     def generate_presigned_url(self, op, Params, ExpiresIn):
         self.calls.append(("presign", Params["Key"], ExpiresIn))
         return f"https://r2.example/{Params['Key']}?X-Amz-Expires={ExpiresIn}&sig=abc"
@@ -85,6 +89,18 @@ async def test_r2_upload_file_integrity_check_deletes_on_mismatch(tmp_path, s3):
     with pytest.raises(IOError):
         await r2.upload_file("bad", f)
     assert "bad" not in s3.objects
+
+
+async def test_r2_status_probes_once_then_caches(tmp_path, s3):
+    r2 = R2Client(r2_settings(tmp_path), s3=s3)
+    assert await r2.status() == "ok" and await r2.status() == "ok"
+    assert sum(c[0] == "head_bucket" for c in s3.calls) == 1   # /ready is polled by every open tab
+
+    def gone(Bucket):
+        raise RuntimeError("NoSuchBucket")
+
+    s3.head_bucket = gone
+    assert await r2.status(ttl=0) == "unavailable"   # ttl=0 forces a re-probe
 
 
 def test_r2_endpoint_derivation(tmp_path):

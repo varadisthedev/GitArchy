@@ -13,6 +13,7 @@ import { fullDate } from "@/lib/format";
 import { Avatar } from "@/components/ui/bits";
 import { GithubButton, GithubMark } from "@/components/auth/github-button";
 import { ErrorState, InlineError, PageHeader, Skeleton, Spinner } from "@/components/ui/states";
+import { StorageStatus } from "@/components/ui/storage-status";
 
 const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const AVATAR_MAX = 2 * 1024 * 1024;
@@ -47,6 +48,9 @@ export function AccountSettings() {
       </Section>
       <Section id="gh-h" title="GitHub" description="Connect GitHub to import repositories with their full history. Gitarchy stores the token on the server and only ever reads.">
         <GithubConnection />
+      </Section>
+      <Section id="st-h" title="Storage" description="Repository bundle downloads are built on the server and stored in object storage. Checked against the bucket itself, not just the configuration.">
+        <StorageStatus />
       </Section>
       <Section id="ses-h" title="Session" description="Sessions last 30 minutes and aren't refreshed. Signing out revokes this session's token on the server.">
         <SessionInfo />

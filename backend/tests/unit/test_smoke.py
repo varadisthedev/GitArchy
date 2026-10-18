@@ -5,6 +5,7 @@ def test_health_ready(client):
     assert client.get("/health").json() == {"status": "ok"}
     r = client.get("/ready")
     assert r.status_code == 200 and r.json()["checks"] == {"database": "memory", "git": "ok"}
+    assert r.json()["optional"]["r2"] == "off"   # no credentials in the test settings
 
 
 def test_register_login_me(client):

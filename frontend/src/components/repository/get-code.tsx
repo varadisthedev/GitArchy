@@ -30,8 +30,10 @@ export function GetCode({ repoId, repoName }: { repoId: string; repoName: string
             </p>
           </div>
           <pre className="overflow-x-auto rounded-md bg-deep px-3 py-2 font-mono text-[0.75rem] text-fg">git clone {repoName}.bundle {repoName}</pre>
-          {r2 === false ? (
+          {r2 === "off" ? (
             <p className="text-xs text-fg-3">Bundle export isn&apos;t configured on this server (no object storage).</p>
+          ) : r2 === "unavailable" ? (
+            <p className="text-xs text-warn">Object storage isn&apos;t reachable right now, so bundles can&apos;t be built. Try again shortly.</p>
           ) : exp.data ? (
             <div className="space-y-2">
               <p className="flex items-center gap-1.5 text-xs text-ok">
@@ -44,7 +46,7 @@ export function GetCode({ repoId, repoName }: { repoId: string; repoName: string
               <p className="text-2xs text-fg-3">The link expires in {Math.round(exp.data.expires_in / 60)} minutes.</p>
             </div>
           ) : (
-            <button className="btn w-full" disabled={exp.isPending || r2 === undefined} onClick={() => exp.mutate()}>
+            <button className="btn w-full" disabled={exp.isPending || !r2} onClick={() => exp.mutate()}>
               {exp.isPending ? <><Spinner /> Packing bundle…</> : "Create bundle"}
             </button>
           )}

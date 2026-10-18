@@ -1,6 +1,7 @@
 """Filebase or Cloudflare R2 through its S3-compatible API (boto3). Object storage only - never a live Git filesystem."""
 import asyncio
 import hashlib
+import time
 from pathlib import Path
 
 import boto3
@@ -29,6 +30,8 @@ class R2Client:
             region, key_id, self.bucket = "auto", settings.r2_access_key_id, settings.r2_bucket_name
             secret = settings.r2_secret_access_key.get_secret_value()
         self._timeout = settings.external_timeout_s
+        self._checked_at: float | None = None  # None, not 0.0: time.monotonic() may start above any ttl
+        self._status = "unavailable"
         self.s3 = s3 or boto3.client(
             "s3", endpoint_url=endpoint, region_name=region,
             aws_access_key_id=key_id, aws_secret_access_key=secret,
@@ -41,6 +44,19 @@ class R2Client:
     async def ping(self) -> bool:
         await self._t(self.s3.head_bucket, Bucket=self.bucket)
         return True
+
+    async def status(self, ttl: float = 60.0) -> str:
+        """"ok" or "unavailable", cached: /ready is polled by every open tab and head_bucket is a real call."""
+        now = time.monotonic()
+        if self._checked_at is not None and now - self._checked_at < ttl:
+            return self._status
+        try:
+            await asyncio.wait_for(self.ping(), self._timeout)
+            self._status = "ok"
+        except Exception:  # credentials rejected, bucket gone, endpoint unreachable: all "unavailable" to a user
+            self._status = "unavailable"
+        self._checked_at = now
+        return self._status
 
     async def upload_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream",
                            metadata: dict | None = None) -> str:

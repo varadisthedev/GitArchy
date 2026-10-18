@@ -30,7 +30,7 @@ export function ImportGithub() {
   const cancel = useRef(false);
   const [stopping, setStopping] = useState(false);
 
-  const all = repos.data ?? [];
+  const all = useMemo(() => repos.data ?? [], [repos.data]);
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return all.filter(

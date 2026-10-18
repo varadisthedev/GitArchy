@@ -109,7 +109,7 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
 
     @app.get("/ready", tags=["ops"])
     async def ready(request: Request):
-        """Required: database + git. Optional integrations are reported as configured/not, never pinged for secrets."""
+        """Required: database + git. Optional integrations report configured/not; none of them leak secrets."""
         ctx: Context = request.app.state.ctx
         checks = {}
         try:
@@ -123,7 +123,8 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
         except Exception:
             checks["git"] = "unavailable"
         ok = checks["database"] != "unavailable" and checks["git"] == "ok"
-        optional = {"r2": bool(ctx.r2), "cloudinary": bool(ctx.cloudinary),
+        # r2 is the one integration a user can watch fail (bundle export), so it is really probed
+        optional = {"r2": await ctx.r2.status() if ctx.r2 else "off", "cloudinary": bool(ctx.cloudinary),
                     "analytics_enabled": bool(ctx.jobs), "spark_worker_connected": bool(ctx.jobs and ctx.jobs.worker_available)}
         return JSONResponse({"status": "ready" if ok else "not_ready", "checks": checks, "optional": optional},
                             200 if ok else 503)
