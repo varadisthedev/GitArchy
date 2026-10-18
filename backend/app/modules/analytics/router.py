@@ -40,6 +40,10 @@ async def survey_cooldown(ctx: Context) -> None:
     afternoon and read the change straight off the delta. Below the floor the survey is public data
     only, so there is nothing a delta could disclose and no reason to make anyone wait.
     """
+    if any(j["task_type"] in GLOBAL_TASKS for j in await ctx.store.list_open_jobs()):
+        # one at a time, so a burst cannot slip past the wait below while the first is still running
+        # (two requests racing here see the same gap the per-user quota above already races on)
+        raise QuotaExceeded("A survey is already running")
     newest = await ctx.store.get_survey()
     if not newest:
         return
@@ -138,7 +142,10 @@ async def get_results(job_id: str, auth: AuthUser = Depends(current_user), ctx: 
     job = await _own_job(ctx, auth, job_id)
     if job["status"] != "succeeded":
         raise Conflict(f"Job is {job['status']}", code="results_not_ready")
-    return {"job_id": job["id"], "task_type": job["task_type"], "result": job["result"], "metrics": job["metrics"]}
+    # A global run is the platform's, not the submitter's. Handing its raw counts back here would
+    # keep an old run exact long after /survey has moved on - the pair you need to subtract.
+    result = survey_shares(job["result"]) if job["task_type"] in GLOBAL_TASKS else job["result"]
+    return {"job_id": job["id"], "task_type": job["task_type"], "result": result, "metrics": job["metrics"]}
 
 
 @router.get("/repositories/{repo_id}/languages")

@@ -396,8 +396,12 @@ def test_a_survey_holding_private_repositories_cannot_be_rerun_at_will(client, a
     appearing straight off the delta. A public-only survey has nothing to protect, so it is free.
     """
     _, h = alice
-    submit = lambda: client.post(f"{API}/analytics/jobs", headers=h,  # noqa: E731
-                                 json={"task_type": "platform_survey"})
+    def submit():
+        """Submit, and clear the queued job: only the wait is under test here, not the one-at-a-time rule."""
+        r = client.post(f"{API}/analytics/jobs", headers=h, json={"task_type": "platform_survey"})
+        if r.status_code == 202:
+            client.post(f"{API}/analytics/jobs/{r.json()['id']}/cancel", headers=h)
+        return r
 
     assert submit().status_code == 202          # nothing measured yet: nothing to difference against
 
@@ -407,3 +411,28 @@ def test_a_survey_holding_private_repositories_cannot_be_rerun_at_will(client, a
 
     _save_survey(client, 3)                     # newest run is public-only again
     assert submit().status_code == 202
+
+
+def test_a_survey_in_flight_blocks_another_and_its_result_is_shares_only(client, alice):
+    """The wait is checked against stored runs, which only appear when a job finishes.
+
+    Without this, a burst submitted before the first one lands clears the wait every time. And a
+    finished global run must not hand its raw counts back here either: that is one half of the pair
+    you would subtract, kept exact long after /survey has moved on.
+    """
+    _, h = alice
+    store = client.app.state.ctx.store
+    first = client.post(f"{API}/analytics/jobs", headers=h, json={"task_type": "platform_survey"})
+    assert first.status_code == 202
+
+    second = client.post(f"{API}/analytics/jobs", headers=h, json={"task_type": "platform_survey"})
+    assert second.status_code == 429 and "already running" in second.json()["error"]["message"]
+
+    jid = first.json()["id"]
+    asyncio.run(store.update_job(jid, status="succeeded", finished_at=utcnow(), result={
+        "accounts": 5, "repos": 9, "files": 40, "commits": 70, "languages": [],
+        "visibility": [{"label": "private", "count": 4, "share": 0.44}], "message_lengths": []}))
+    body = client.get(f"{API}/analytics/jobs/{jid}/results", headers=h).json()
+
+    assert set(body["result"]) == {"languages", "visibility", "message_lengths"}
+    assert set(body["result"]["visibility"][0]) == {"label", "share"}   # no count, and no totals
