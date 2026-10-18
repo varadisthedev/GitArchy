@@ -40,8 +40,22 @@ export function toSeries(history: SurveyRun[], pick: Pick) {
  * the series is of measurements taken, not of months passed, and the first run has nothing to
  * stretch across. Until there are two, the same shares are drawn as the single bar they are.
  */
-function SurveyPanel({ title, caption, groups, history, pick }: {
-  title: string; caption: string; groups: SurveyGroup[]; history: SurveyRun[]; pick: Pick;
+/** A slider switch, because the two chart styles are one choice with two settings, not two buttons. */
+function StyleSwitch({ area, onChange }: { area: boolean; onChange: (area: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={area} onClick={() => onChange(!area)}
+      className="inline-flex items-center gap-2 text-xs text-fg-2 transition-colors hover:text-fg">
+      <span aria-hidden
+        className={`relative h-5 w-9 flex-none rounded-full border transition-colors ${area ? "border-stone bg-stone-2" : "border-line bg-surface"}`}>
+        <span className={`absolute top-[3px] size-3 rounded-full transition-all ${area ? "left-[19px] bg-stone-hi" : "left-[3px] bg-fg-3"}`} />
+      </span>
+      <span className="font-semibold">{area ? "Area" : "Bars"}</span>
+    </button>
+  );
+}
+
+function SurveyPanel({ title, caption, groups, history, pick, area }: {
+  title: string; caption: string; groups: SurveyGroup[]; history: SurveyRun[]; pick: Pick; area: boolean;
 }) {
   const shown = groups.filter((g) => g.count > 0);
   // A single measurement is drawn as the flat band it is: one run repeated has nothing to slope
@@ -61,7 +75,20 @@ function SurveyPanel({ title, caption, groups, history, pick }: {
         { key: "share", label: "Share", numeric: true, format: (v) => pct(Number(v)) },
       ]}
     >
-      <ShareArea data={trend.data} x="_t" series={trend.series} />
+      {area ? (
+        <ShareArea data={trend.data} x="_t" series={trend.series} />
+      ) : (
+        <div className="flex h-7 w-full gap-[2px] overflow-hidden rounded-md bg-surface">
+          {shown.map((g) => (
+            <span
+              key={g.label}
+              className="h-full first:rounded-l-md last:rounded-r-md"
+              style={{ width: `${g.share * 100}%`, backgroundColor: colorFor(g.label) }}
+              title={`${g.label} · ${pct(g.share)} · ${g.count.toLocaleString()}`}
+            />
+          ))}
+        </div>
+      )}
       <ul className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
         {shown.map((g) => (
           <li key={g.label} className="flex items-baseline gap-2 text-xs">
@@ -80,6 +107,7 @@ export function PlatformSurvey() {
   const survey = useSurvey();
   const submit = useSubmitJob();
   const [started, setStarted] = useState(false);
+  const [area, setArea] = useState(true);
   const data = survey.data;
   const r = data?.result ?? null;
   // a result cached before histories were kept still charts, as the one run it is
@@ -100,14 +128,17 @@ export function PlatformSurvey() {
         title="Platform survey"
         description="What every Gitarchy account with GitHub connected is actually building, counted together."
         actions={
-          data?.worker_available ? (
-            <button type="button" className="btn" onClick={refresh} disabled={submit.isPending || started}>
-              <RefreshCw className={`size-4 ${submit.isPending ? "animate-spin" : ""}`} aria-hidden />
-              {started ? "Running…" : "Run survey"}
-            </button>
-          ) : (
-            <p className="text-xs text-fg-3">No Spark worker connected — showing the last run.</p>
-          )
+          <div className="flex items-center gap-5">
+            {r ? <StyleSwitch area={area} onChange={setArea} /> : null}
+            {data?.worker_available ? (
+              <button type="button" className="btn" onClick={refresh} disabled={submit.isPending || started}>
+                <RefreshCw className={`size-4 ${submit.isPending ? "animate-spin" : ""}`} aria-hidden />
+                {started ? "Running…" : "Run survey"}
+              </button>
+            ) : (
+              <p className="text-xs text-fg-3">No Spark worker connected — showing the last run.</p>
+            )}
+          </div>
         }
       />
 
@@ -153,6 +184,7 @@ export function PlatformSurvey() {
                 groups={r.languages}
                 history={history}
                 pick={(x) => x.languages}
+                area={area}
               />
             </div>
             <SurveyPanel
@@ -161,6 +193,7 @@ export function PlatformSurvey() {
               groups={r.visibility}
               history={history}
               pick={(x) => x.visibility}
+              area={area}
             />
             <SurveyPanel
               title="Commit message length"
@@ -168,6 +201,7 @@ export function PlatformSurvey() {
               groups={r.message_lengths}
               history={history}
               pick={(x) => x.message_lengths}
+              area={area}
             />
           </div>
 
