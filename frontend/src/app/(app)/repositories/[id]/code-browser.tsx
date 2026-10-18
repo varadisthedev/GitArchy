@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRepo, useTree, useFile } from "@/lib/api/queries";
 import { atLeast } from "@/lib/api/types";
-import { bytes, joinPath, parentPath } from "@/lib/format";
+import { bytes, isSha, joinPath, parentPath } from "@/lib/format";
 import { BranchPicker } from "@/components/repository/branch-picker";
 import { GetCode } from "@/components/repository/get-code";
 import { LastCommit } from "@/components/repository/last-commit";
@@ -15,14 +15,12 @@ import { blobHref, entryIcon, newFileHref, treeHref } from "@/components/reposit
 import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
 import { LanguagesCard } from "@/components/repository/languages-card";
 
-const isBranchRef = (ref: string) => !/^[0-9a-f]{7,40}$/.test(ref);
-
 export function CodeBrowser({ id, refParam, path }: { id: string; refParam?: string; path: string }) {
   const repo = useRepo(id);
   const router = useRouter();
   const ref = refParam || repo.data?.default_branch || "";
   const tree = useTree(id, ref, path);
-  const canWrite = atLeast(repo.data?.role, "writer") && isBranchRef(ref);
+  const canWrite = atLeast(repo.data?.role, "writer") && !isSha(ref);
 
   const readme = tree.data?.entries.find((e) => e.type === "file" && /^readme(\.md|\.markdown|\.txt)?$/i.test(e.name));
 

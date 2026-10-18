@@ -140,20 +140,36 @@ test("create a branch and compare it", async () => {
   await expect(page.getByText("REFUNDS.md").first()).toBeVisible();
 });
 
-test("activity page charts commits by month, zero-filling quiet months", async () => {
+test("code search finds a line and links into the file", async () => {
+  await page.goto(`${repoUrl}/search`);
+  await page.getByRole("searchbox", { name: "Search this repository" }).fill("card fee");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page).toHaveURL(/q=card\+fee/);
+  const hit = page.getByRole("link", { name: /Card fee/ });
+  await expect(hit).toBeVisible();                       // case-insensitive: the file says """Card fee."""
+  await expect(page.getByText("1 match in 1 file")).toBeVisible();
+  await hit.click();
+  await expect(page).toHaveURL(/\/blob\?.*path=src%2Fledger\.py#L2/);
+
+  await page.goto(`${repoUrl}/search?q=zzznotpresent`);
+  await expect(page.getByText("No matches")).toBeVisible();   // a miss is an answer, not an error
+});
+
+test("activity page charts activity by month, zero-filling quiet months", async () => {
   await page.goto("/activity");
-  const chart = page.getByRole("figure").filter({ hasText: "Commits by month" });
+  const chart = page.getByRole("figure").filter({ hasText: "Activity by month" });
   await expect(chart).toBeVisible();
   // three commits were made above (the repo's initial commit is a repo.created event, not a commit)
-  await expect(chart).toContainText("3 commits over the last 12 months");
+  await expect(chart).toContainText("3 commits");
+  await expect(chart).toContainText("over the last 12 months");
 
   await chart.getByRole("button", { name: "Table" }).click();
   const rows = chart.locator("tbody tr");
   await expect(rows).toHaveCount(12); // a continuous 12-month range, not just months with data
   const thisMonth = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date());
   await expect(rows.filter({ hasText: thisMonth }).locator("td").nth(1)).toHaveText("3");
-  // every other month is present and explicitly zero
-  await expect(chart.locator("tbody td", { hasText: /^0$/ })).toHaveCount(11);
+  // every other month is present and explicitly zero in the commits column
+  await expect(chart.locator("tbody tr td:nth-child(2)").filter({ hasText: /^0$/ })).toHaveCount(11);
 });
 
 test("branch picker switches the code view", async () => {

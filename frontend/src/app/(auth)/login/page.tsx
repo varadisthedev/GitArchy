@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
+import { one } from "@/lib/format";
 import { LoginForm } from "@/components/auth/auth-forms";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   return (
     <LoginForm
       next={one(sp.next)}

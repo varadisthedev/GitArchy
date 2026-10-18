@@ -1,6 +1,6 @@
+import { one } from "@/lib/format";
 import { EditFile } from "./edit-file";
 
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const clean = (p?: string) => (p ?? "").replace(/^\/+|\/+$/g, "");
 
 export default async function Page({ params, searchParams }: PageProps<"/repositories/[id]/edit">) {

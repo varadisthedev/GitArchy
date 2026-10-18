@@ -1,6 +1,4 @@
 """Repository ownership / collaborator authorization."""
-import pytest
-
 from tests.conftest import register_and_login, requires_git
 
 API = "/api/v1"
@@ -89,7 +87,7 @@ def test_admin_cannot_escalate_or_touch_owner(client, alice, bob):
     rid = mk(client, ha)
     invite(client, ha, rid, "bob@example.com", "admin")
     assert invite(client, hb, rid, "alice@example.com", "reader").status_code == 403   # owner untouchable
-    carol = register_and_login(client, "carol@example.com", "Carol")
+    register_and_login(client, "carol@example.com", "Carol")
     assert invite(client, hb, rid, "carol@example.com", "admin").status_code == 403    # only owner grants admin
     assert invite(client, hb, rid, "carol@example.com", "writer").status_code == 200
     assert client.delete(f"{API}/repositories/{rid}/members/{uid_a}", headers=hb).status_code == 403

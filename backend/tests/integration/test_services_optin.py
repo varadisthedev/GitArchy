@@ -7,7 +7,6 @@ import io
 import os
 import subprocess
 import uuid
-from pathlib import Path
 
 import pytest
 
@@ -20,8 +19,6 @@ API = "/api/v1"
 
 def test_native_git_bundle_roundtrip(client, alice, tmp_path):
     """Export a real repo as a bundle and prove with real git that it clones back to identical content."""
-    from app.integrations.git.manager import GitManager
-    from app.integrations.git.storage import LocalRepositoryStorage
     _, h = alice
     rid = client.post(f"{API}/repositories", headers=h, json={"name": "rt"}).json()["id"]
     client.post(f"{API}/repositories/{rid}/commits", headers=h, json={

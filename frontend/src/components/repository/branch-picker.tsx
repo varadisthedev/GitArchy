@@ -3,12 +3,10 @@
 import { Check, ChevronDown, GitBranch, GitBranchPlus, GitCommitHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useBranches, useCreateBranch } from "@/lib/api/queries";
-import { shortSha } from "@/lib/format";
+import { isSha, shortSha } from "@/lib/format";
 import { validBranch } from "@/lib/validation";
 import { Popover } from "@/components/ui/popover";
 import { InlineError, Spinner } from "@/components/ui/states";
-
-const isSha = (r: string) => /^[0-9a-f]{7,40}$/.test(r);
 
 export function BranchPicker({
   repoId,

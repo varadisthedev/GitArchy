@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 PROTOCOL_VERSION = 1
 TERMINAL = {"succeeded", "failed", "cancelled"}
-OPEN = {"queued", "dispatched", "running"}
 
 # ---------------------------------------------------------------- task allow-list
 

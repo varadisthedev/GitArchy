@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useCommitFiles, useFile, useRepo } from "@/lib/api/queries";
 import { atLeast, type FileBlob } from "@/lib/api/types";
-import { baseName, bytes, parentPath, plural } from "@/lib/format";
+import { baseName, bytes, isSha, parentPath, plural } from "@/lib/format";
 import { BranchPicker } from "@/components/repository/branch-picker";
 import { CodeView } from "@/components/repository/code-view";
 import { LastCommit } from "@/components/repository/last-commit";
@@ -18,7 +18,6 @@ import { useToast } from "@/components/ui/toast";
 import { EmptyState, ErrorState, InlineError, Skeleton, Spinner } from "@/components/ui/states";
 
 const IMG: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
-const isBranchRef = (ref: string) => !/^[0-9a-f]{7,40}$/.test(ref);
 
 function toBlob(f: FileBlob) {
   if (f.encoding === "utf-8") return new Blob([f.content], { type: "text/plain;charset=utf-8" });
@@ -36,7 +35,7 @@ export function FileView({ id, refParam, path }: { id: string; refParam?: string
   const [mode, setMode] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const canWrite = atLeast(repo.data?.role, "writer") && isBranchRef(ref);
+  const canWrite = atLeast(repo.data?.role, "writer") && !isSha(ref);
 
   if (!repo.data) return <Skeleton className="h-96" />;
   const name = baseName(path);

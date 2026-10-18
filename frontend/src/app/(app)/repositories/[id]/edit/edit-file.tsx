@@ -7,7 +7,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, isApiError } from "@/lib/api/client";
 import { useCommitFiles, useFile, useRepo } from "@/lib/api/queries";
 import { atLeast, type FileChange } from "@/lib/api/types";
-import { baseName, bytes, joinPath, plural } from "@/lib/format";
+import { baseName, bytes, isSha, joinPath, plural } from "@/lib/format";
 import { validBranch, validPath } from "@/lib/validation";
 import { CodeEditor } from "@/components/repository/code-editor";
 import { PathCrumbs } from "@/components/repository/path-crumbs";
@@ -88,7 +88,7 @@ export function EditFile({ id, refParam, path, dir, mode }: { id: string; refPar
         You&apos;re a reader on this repository. Ask an admin for writer access to edit files.
       </EmptyState>
     );
-  if (/^[0-9a-f]{7,40}$/.test(branch))
+  if (isSha(branch))
     return <EmptyState title="Pick a branch to edit">You&apos;re viewing a commit. Commits are immutable; switch to a branch to make changes.</EmptyState>;
   if (mode === "edit" && original.isError) return <ErrorState error={original.error} retry={() => original.refetch()} />;
   if (mode === "edit" && original.data && original.data.encoding !== "utf-8")

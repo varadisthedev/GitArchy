@@ -7,17 +7,9 @@ what makes an ephemeral disk survivable: anything missing here is pulled back on
 import os
 import shutil
 import stat
-import uuid
 from pathlib import Path
-from typing import Protocol
 
 from app.utils.validators import parse_uuid
-
-
-class RepositoryStorage(Protocol):
-    def path_for(self, repo_id: str) -> Path: ...
-    def exists(self, repo_id: str) -> bool: ...
-    def remove(self, repo_id: str) -> None: ...
 
 
 def _force_remove(func, path, _exc):
@@ -45,7 +37,3 @@ class LocalRepositoryStorage:
         p = self.path_for(repo_id)
         if p.is_dir() and not p.is_symlink():
             shutil.rmtree(p, onexc=_force_remove)
-
-    @staticmethod
-    def new_id() -> str:
-        return str(uuid.uuid4())

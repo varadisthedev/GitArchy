@@ -2,15 +2,13 @@
 import asyncio
 import io
 import time
-import uuid
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from botocore.exceptions import ClientError
 from PIL import Image
 
-from app.core.config import Settings
 from app.integrations.cloudinary.client import CloudinaryClient, InvalidImage, validate_image
 from app.integrations.r2.client import R2Client
 from tests.conftest import make_settings, requires_git

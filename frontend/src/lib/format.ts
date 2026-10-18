@@ -25,6 +25,11 @@ export function bytes(n: number | null | undefined): string {
   return `${(n / 1024 ** 2).toFixed(1)} MB`;
 }
 
+/** One value out of a Next.js searchParams entry. */
+export const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+/** A ref that names a commit rather than a branch. Commits are immutable, so writes are off. */
+export const isSha = (ref: string) => /^[0-9a-f]{7,40}$/.test(ref);
+
 export const shortSha = (sha: string) => sha.slice(0, 7);
 
 export function seconds(s: number | undefined | null): string {

@@ -1,6 +1,6 @@
-# Gitarchey backend
+# Gitarchy backend
 
-FastAPI backend for Gitarchey: a small GitHub-style platform (users, repositories, branches, files, commits, diffs,
+FastAPI backend for Gitarchy: a small GitHub-style platform (users, repositories, branches, files, commits, diffs,
 activity) with a PySpark analytics component. Version control is the **real `git` CLI**; metadata lives in
 **Astra DB (Cassandra)**; R2 stores exports/uploads; Cloudinary stores avatars; Spark jobs run on an optional
 **Colab worker that connects out over WebSocket**.

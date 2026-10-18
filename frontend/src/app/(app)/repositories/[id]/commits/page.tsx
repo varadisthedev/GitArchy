@@ -1,6 +1,5 @@
+import { one } from "@/lib/format";
 import { Commits } from "./commits";
-
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function Page({ params, searchParams }: PageProps<"/repositories/[id]/commits">) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);

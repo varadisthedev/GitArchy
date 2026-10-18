@@ -1,4 +1,4 @@
-"""Gitarchey API entrypoint."""
+"""Gitarchy API entrypoint."""
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -99,7 +99,7 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
             await st.close()
             log.info("shutdown_complete")
 
-    app = FastAPI(title="Gitarchey API", version="0.1.0", lifespan=lifespan,
+    app = FastAPI(title="Gitarchy API", version="0.1.0", lifespan=lifespan,
                   docs_url=None if settings.is_prod else "/docs",
                   redoc_url=None, openapi_url=None if settings.is_prod else "/openapi.json")
     install_handlers(app)
