@@ -10,6 +10,7 @@ const TONE: Record<string, string> = {
   "branch.created": "info",
   "repo.created": "ok",
   "repo.imported": "ok",
+  "repo.restored": "ok",
   "repo.updated": "idle",
   "member.set": "idle",
   "member.removed": "idle",
@@ -43,9 +44,10 @@ function describe(e: ActivityEvent, n: Names, showRepo: boolean): ReactNode {
     case "repo.created":
       return <>{actor} created {repoLink}</>;
     case "repo.imported":
+    case "repo.restored":
       return (
         <>
-          {actor} imported {repoLink} from{" "}
+          {actor} {e.type === "repo.restored" ? "restored" : "imported"} {repoLink} from{" "}
           <span className="font-mono text-[0.78rem] text-fg">{String(d.source ?? "GitHub")}</span>
           {typeof d.branches === "number" ? <> · {d.branches} {d.branches === 1 ? "branch" : "branches"}</> : null}
         </>

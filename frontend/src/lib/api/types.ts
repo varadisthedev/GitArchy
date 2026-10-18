@@ -29,6 +29,10 @@ export interface Repo {
   created_at: string;
   updated_at: string;
   role: Role;
+  /** "owner/name" on GitHub when this repository was imported, else null. */
+  source: string | null;
+  /** The server has the metadata but not the Git data (ephemeral disk). Imported repos can be restored. */
+  storage_missing: boolean;
 }
 
 export interface Member {
@@ -104,6 +108,7 @@ export interface ActivityEvent {
   type:
     | "repo.created"
     | "repo.imported"
+    | "repo.restored"
     | "repo.updated"
     | "branch.created"
     | "commit.created"

@@ -291,6 +291,17 @@ export const useImportGithubRepo = () => {
   });
 };
 
+/** Re-clone an imported repository the server lost. Same cost as an import, so the same timeout. */
+export const useRestoreRepo = (id: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<ImportResult>(`/github/imports/${id}/restore`, { method: "POST", timeoutMs: 300_000 }),
+    // everything under ["repo", id] was failing with repo_storage_unavailable; it can all load now
+    onSuccess: () =>
+      Promise.all([["repo", id], qk.repos, qk.myActivity].map((queryKey) => qc.invalidateQueries({ queryKey }))),
+  });
+};
+
 export const useUpdateMe = () =>
   useInvalidating((b: { display_name: string }) => api<User>("/users/me", { method: "PATCH", body: b }), () => [qk.me]);
 

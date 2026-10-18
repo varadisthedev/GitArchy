@@ -18,9 +18,14 @@ PRESIGN_S = 300
 _MAGIC = {"application/pdf": b"%PDF-", "application/zip": b"PK\x03\x04"}
 
 
-def _r2(ctx: Context):
+async def _r2(ctx: Context):
+    """There is no local fallback: bundles and uploads live in object storage or nowhere. Rather than
+    let boto fail halfway through a bundle, refuse up front with the reason. status() is cached."""
     if not ctx.r2:
         raise Unavailable("Object storage is not configured", code="integration_not_configured")
+    if await ctx.r2.status() != "ok":
+        raise Unavailable("Object storage is unreachable, so this can't be done right now",
+                          code="storage_unreachable")
     return ctx.r2
 
 
@@ -28,7 +33,7 @@ def _r2(ctx: Context):
 async def export_repo(repo_id: str, auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
     """Snapshot of ALL refs as a git bundle. Consistency: a point-in-time view of refs at bundle creation
     (git takes its own locks); writes after that are not included. Restore is not implemented."""
-    r2 = _r2(ctx)
+    r2 = await _r2(ctx)
     repo, _ = await require(ctx, auth.id, repo_id, "reader")
     key = f"exports/{repo['id']}/{utcnow():%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:8]}.bundle"
     with tempfile.TemporaryDirectory(prefix="gitarchey-export-") as tmp:
@@ -44,7 +49,7 @@ async def export_repo(repo_id: str, auth: AuthUser = Depends(current_user), ctx:
 @router.post("/uploads", status_code=201, dependencies=[Depends(limit_user("upload"))])
 async def upload_object(file: UploadFile = File(...), auth: AuthUser = Depends(current_user),
                         ctx: Context = Depends(get_ctx)):
-    r2 = _r2(ctx)
+    r2 = await _r2(ctx)
     limit = ctx.settings.max_upload_bytes
     data = await file.read(limit + 1)
     if len(data) > limit:
@@ -72,7 +77,7 @@ async def upload_object(file: UploadFile = File(...), auth: AuthUser = Depends(c
 
 @router.get("/uploads/{upload_id}")
 async def get_upload(upload_id: str, auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
-    r2 = _r2(ctx)
+    r2 = await _r2(ctx)
     uid = parse_uuid(upload_id, "upload id").replace("-", "")
     key = f"uploads/{auth.id}/{uid}"  # key is derived from the caller's id: other users' objects are unreachable
     try:

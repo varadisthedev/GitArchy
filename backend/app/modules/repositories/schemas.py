@@ -40,6 +40,8 @@ class RepoOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     role: str
+    source: str | None = None       # "owner/name" on GitHub, for repositories that were imported
+    storage_missing: bool = False   # git data is gone from disk; an imported repo can be restored
 
 
 class MemberSet(BaseModel):

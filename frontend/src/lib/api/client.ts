@@ -122,6 +122,8 @@ const MESSAGES: Record<string, string> = {
   nothing_to_commit: "Nothing changed, so there's nothing to commit.",
   file_too_large: "This file is too large to display in the browser.",
   commit_too_large: "This commit is larger than the server allows.",
+  storage_unreachable:
+    "Object storage isn't reachable from the server right now, so bundles and uploads are unavailable. Nothing was lost — try again in a few minutes.",
   repo_storage_unavailable: "This repository's Git storage is unavailable on the server right now. Its details are safe; files and history can't be read until storage is restored.",
   integration_not_configured: "This feature isn't configured on this server.",
   analytics_disabled: "Analytics is turned off on this server.",

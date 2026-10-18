@@ -65,3 +65,13 @@ async def import_one(body: GithubImport, auth: AuthUser = Depends(current_user),
     repo, summary = await service.import_repo(ctx, auth, body.full_name, body.visibility)
     return ImportResult(repo=out(repo, "owner"), source=body.full_name,
                         branches=summary["branches"], commits_indexed=summary["commits_indexed"])
+
+
+@router.post("/imports/{repo_id}/restore", response_model=ImportResult,
+             dependencies=[Depends(limit_user("github_import"))])
+async def restore_one(repo_id: str, auth: AuthUser = Depends(current_user),
+                      ctx: Context = Depends(get_ctx)):
+    """Re-clone a repository this server imported and then lost (ephemeral disk)."""
+    repo, summary = await service.restore_repo(ctx, auth, repo_id)
+    return ImportResult(repo=out(repo, "owner", ctx), source=summary["source"],
+                        branches=summary["branches"], commits_indexed=summary["commits_indexed"])

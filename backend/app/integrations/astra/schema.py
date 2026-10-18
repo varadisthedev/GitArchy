@@ -70,6 +70,11 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
             user_id uuid PRIMARY KEY, github_id bigint, login text, access_token text, scope text,
             avatar_url text, connected_at timestamp)""",
     ]),
+    (3, "remember where an imported repository came from", [
+        # Git data lives on the instance's disk, which is ephemeral on most hosts. Without the origin
+        # recorded here a wiped disk leaves a repository that can never be rebuilt, only deleted.
+        """ALTER TABLE repositories_by_id ADD source text""",
+    ]),
 ]
 
 VERSION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (

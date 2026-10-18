@@ -197,7 +197,9 @@ class AstraStore:
         return {"id": str(r["repo_id"]), "owner_id": str(r["owner_id"]), "name": r["name"],
                 "description": r["description"] or "", "visibility": r["visibility"],
                 "default_branch": r["default_branch"], "created_at": _ts(r["created_at"]),
-                "updated_at": _ts(r["updated_at"])}
+                "updated_at": _ts(r["updated_at"]),
+                # "owner/name" on GitHub for an imported repository, else None
+                "source": r.get("source")}
 
     async def create_repo(self, r: dict) -> None:
         rid, oid, name = _u(r["id"]), _u(r["owner_id"]), r["name"].lower()
@@ -214,9 +216,9 @@ class AstraStore:
                 raise Conflict("You already have a repository with this name", code="repo_name_taken")
         await self._x(
             "INSERT INTO repositories_by_id (repo_id, owner_id, name, description, visibility, "
-            "default_branch, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "default_branch, created_at, updated_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (rid, oid, r["name"], r["description"], r["visibility"], r["default_branch"],
-             r["created_at"], r["updated_at"]))
+             r["created_at"], r["updated_at"], r.get("source")))
         await self.set_member(r["id"], r["owner_id"], "owner")
 
     async def get_repo(self, repo_id: str) -> dict | None:

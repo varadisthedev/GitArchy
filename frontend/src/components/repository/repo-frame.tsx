@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useMembers, useRepo } from "@/lib/api/queries";
 import { RoleChip, VisibilityChip } from "@/components/ui/bits";
 import { ErrorState, Skeleton } from "@/components/ui/states";
+import { RestoreBanner } from "@/components/repository/restore-banner";
 import { REPO_RE } from "@/components/layout/sidebar";
 
 /** Repository chrome shared by every /repositories/[id]/* page. */
@@ -43,6 +44,7 @@ export function RepoFrame({ id, children }: { id: string; children: ReactNode })
         )}
         <RepoTabs id={id} />
       </header>
+      {repo.data ? <RestoreBanner repo={repo.data} /> : null}
       {children}
     </div>
   );

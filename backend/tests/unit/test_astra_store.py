@@ -135,7 +135,9 @@ def test_schema_is_additive_and_versioned():
     all_cql = " ".join(s for _, _, stmts in schema.MIGRATIONS for s in stmts).upper()
     assert "DROP " not in all_cql and "TRUNCATE" not in all_cql
     for _, _, stmts in schema.MIGRATIONS:
-        assert all("IF NOT EXISTS" in s.upper() for s in stmts)
+        # CREATE must be re-runnable. ALTER ... ADD can't be: "IF NOT EXISTS" there is only valid on
+        # newer Cassandra than Astra guarantees, and the version table already stops a second run.
+        assert all("IF NOT EXISTS" in s.upper() or s.upper().startswith("ALTER TABLE") for s in stmts)
     for t in ("users_by_email", "users_by_id", "repositories_by_id", "repositories_by_owner", "members_by_repo",
               "branches_by_repo", "commits_by_repo", "activity_by_user", "events_by_repo", "notifications_by_user",
               "analytics_jobs_by_id", "analytics_results_by_repo", "revoked_tokens"):

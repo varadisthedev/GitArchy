@@ -78,6 +78,8 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
         # (redirect uri + CORS origins). Never log a secret: presence only, checked above.
         log.info("startup_complete", extra={
             "env": settings.app_env, "db": st.kind,
+            # which object-storage provider won: filebase takes precedence when fully configured
+            "storage": {"endpoint": ctx.r2.endpoint, "bucket": ctx.r2.bucket} if ctx.r2 else None,
             "integrations": {"r2": settings.r2_configured, "cloudinary": settings.cloudinary_configured,
                              "analytics": settings.workers_enabled, "github": settings.github_configured},
             "github_oauth_client_id": settings.github_oauth_client_id or None,

@@ -13,6 +13,7 @@ import uuid
 import pytest
 
 from app.api.dependencies import AuthUser, Context
+from app.core.exceptions import Conflict
 from app.core.security import create_oauth_state, verify_password
 from app.integrations.astra.memory import MemoryStore, utcnow
 from app.integrations.git.manager import GitManager
@@ -116,6 +117,38 @@ async def test_import_clones_indexes_and_feeds_analytics(ctx, remote, monkeypatc
     assert data["kind"] == "commits" and data["rows"] == 2
     assert {c["message"] for c in data["commits"]} == {"first commit", "second commit"}
     assert all(c["repo_id"] == repo["id"] for c in data["commits"])
+
+
+async def test_restore_reclones_a_repository_whose_disk_was_wiped(ctx, remote, monkeypatch):
+    """The whole point of recording `source`: an ephemeral host loses the clone, not the repository."""
+    _patch_github(monkeypatch, remote)
+    _use_local_remote(monkeypatch, ctx, remote)
+    auth = await _user(ctx)
+    repo, _ = await service.import_repo(ctx, auth, "devuser/notes")
+
+    ctx.git.delete_repo(repo["id"])          # what a restart does to Render's disk
+    assert not ctx.storage.exists(repo["id"])
+
+    restored, summary = await service.restore_repo(ctx, auth, repo["id"])
+
+    assert ctx.storage.exists(repo["id"]) and restored["id"] == repo["id"]
+    assert summary["branches"] == 2 and summary["commits_indexed"] == 2
+    assert len(await ctx.git.analytics_log(repo["id"], restored["default_branch"], 50)) == 2
+    assert [e["type"] for e in await ctx.store.list_repo_events(repo["id"], 10)] == [
+        "repo.restored", "repo.imported"]
+
+    with pytest.raises(Conflict):            # storage is present now: restore must not re-clone over it
+        await service.restore_repo(ctx, auth, repo["id"])
+
+
+async def test_restore_refuses_a_repository_that_was_never_imported(ctx, monkeypatch):
+    auth = await _user(ctx)
+    repo = {"id": str(uuid.uuid4()), "owner_id": auth.id, "name": "handmade", "description": "",
+            "visibility": "private", "default_branch": "main", "created_at": utcnow(),
+            "updated_at": utcnow()}
+    await ctx.store.create_repo(repo)
+    with pytest.raises(InvalidInput):
+        await service.restore_repo(ctx, auth, repo["id"])
 
 
 async def test_failed_clone_leaves_nothing_behind(ctx, remote, monkeypatch):

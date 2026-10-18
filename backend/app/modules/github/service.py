@@ -23,6 +23,7 @@ from app.integrations.astra.memory import utcnow
 from app.integrations.github import client
 from app.modules.auth.schemas import TokenResponse
 from app.modules.auth.service import public
+from app.modules.repositories.access import require
 from app.utils.validators import InvalidInput, validate_branch, validate_repo_name
 
 log = logging.getLogger("gitarchey.github")
@@ -162,11 +163,13 @@ async def list_remote_repos(ctx: Context, user_id: str) -> list[dict]:
     """GitHub's repositories, each flagged with whether this user already holds that name here."""
     ident = await _identity(ctx, user_id)
     repos = await asyncio.to_thread(client.list_repos, ctx.settings, ident["access_token"])
-    mine = {r["name"].lower() for r in await ctx.store.list_repos_for_user(user_id)}
+    held = await ctx.store.list_repos_for_user(user_id)
+    mine = {r["name"].lower() for r in held}
+    sources = {r["source"] for r in held if r.get("source")}
     for r in repos:
-        # provenance is not a column on repositories, so "already here" is a name match: it can be
-        # wrong if the user renamed an import, which only ever costs them one extra confirmation
-        r["imported"] = _local_name(r["name"]).lower() in mine
+        # exact when the repository was imported after `source` existed; the name match still catches
+        # older imports, at the cost of a false positive if the user renamed one
+        r["imported"] = r["full_name"] in sources or _local_name(r["name"]).lower() in mine
         r["importable"] = not r["empty"] and r["size_kb"] <= ctx.settings.github_max_repo_kb
     return repos
 
@@ -206,7 +209,9 @@ async def import_repo(ctx: Context, auth: AuthUser, full_name: str,
             "description": gh["description"] or f"Imported from github.com/{gh['full_name']}",
             # mirror GitHub: public there is already public, private stays private here
             "visibility": visibility or ("private" if gh["private"] else "public"),
-            "default_branch": branch, "created_at": now, "updated_at": now}
+            "default_branch": branch, "created_at": now, "updated_at": now,
+            # the origin, so a wiped disk can be re-cloned instead of only deleted
+            "source": gh["full_name"]}
     await _claim_name(ctx, repo)
     try:
         head = await ctx.git.clone_bare(repo["id"], gh["clone_url"], ident["access_token"])
@@ -227,6 +232,33 @@ async def import_repo(ctx: Context, auth: AuthUser, full_name: str,
     return repo, summary
 
 
+async def restore_repo(ctx: Context, auth: AuthUser, repo_id: str) -> tuple[dict, dict]:
+    """Re-clone an imported repository whose Git data is gone from the server's disk.
+
+    A host with an ephemeral disk keeps the Cassandra metadata and loses the clone, which leaves every
+    Git-backed route answering 503 with nothing the user can do but delete the repository. The origin
+    recorded at import makes that recoverable. Storage that is present is never touched: this restores
+    what was lost, it does not sync with GitHub.
+    """
+    repo, _ = await require(ctx, auth.id, repo_id, "admin", need_storage=False)
+    if not repo.get("source"):
+        raise InvalidInput("This repository wasn't imported from GitHub, so there is nothing to restore it from",
+                           code="no_source")
+    if ctx.storage.exists(repo["id"]):
+        raise Conflict("This repository's Git data is already on the server", code="storage_present")
+    ident = await _identity(ctx, auth.id)
+    gh = await asyncio.to_thread(client.get_repo, ctx.settings, ident["access_token"], repo["source"])
+    if not gh["clone_url"].startswith("https://"):  # same trust boundary as import
+        raise InvalidInput("That repository has an unsupported clone URL", code="unsupported_clone_url")
+    head = await ctx.git.clone_bare(repo["id"], gh["clone_url"], ident["access_token"])
+    if head != repo["default_branch"]:
+        repo = await ctx.store.update_repo(repo["id"], default_branch=head, updated_at=utcnow())
+    summary = await _index_import(ctx, auth, repo, gh, event="repo.restored")
+    log.info("github_repo_restored", extra={"repo_id": repo["id"], "user_id": auth.id,
+                                            "source": repo["source"]})
+    return repo, summary
+
+
 async def _claim_name(ctx: Context, repo: dict) -> None:
     """Take the first free name. Importing a whole profile shouldn't stop at one collision."""
     base = repo["name"]
@@ -241,7 +273,8 @@ async def _claim_name(ctx: Context, repo: dict) -> None:
                    "Rename or delete one, then import again.", code="repo_name_taken")
 
 
-async def _index_import(ctx: Context, auth: AuthUser, repo: dict, gh: dict) -> dict:
+async def _index_import(ctx: Context, auth: AuthUser, repo: dict, gh: dict,
+                        event: str = "repo.imported") -> dict:
     """Mirror the cloned refs into Cassandra so the UI and activity feed see the history.
 
     Spark reads Git directly (git.analytics_log), so analytics works off the clone regardless of
@@ -262,7 +295,7 @@ async def _index_import(ctx: Context, auth: AuthUser, repo: dict, gh: dict) -> d
                "branches": len(branches), "commits_indexed": len(commits),
                "default_branch": repo["default_branch"]}
     # one event, two tables: the repository's activity page and /activity both pick it up
-    await ctx.store.add_event(repo["id"], auth.id, "repo.imported", summary)
+    await ctx.store.add_event(repo["id"], auth.id, event, summary)
     return summary
 
 

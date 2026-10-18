@@ -18,9 +18,13 @@ def author_ident(auth: AuthUser) -> tuple[str, str]:
     return auth.user["display_name"], f"{auth.id}@users.noreply.gitarchey.local"
 
 
-def out(repo: dict, role: str) -> RepoOut:
+def out(repo: dict, role: str, ctx: Context | None = None) -> RepoOut:
+    """`ctx` adds storage_missing: one stat() per repository, so the UI can offer a restore
+    instead of showing a wall of 503s when the host's disk was wiped."""
     return RepoOut(**{k: repo[k] for k in ("id", "owner_id", "name", "description", "visibility",
-                                           "default_branch", "created_at", "updated_at")}, role=role)
+                                           "default_branch", "created_at", "updated_at")}, role=role,
+                   source=repo.get("source"),
+                   storage_missing=bool(ctx) and not ctx.storage.exists(repo["id"]))
 
 
 @router.post("", response_model=RepoOut, status_code=201, dependencies=[Depends(limit_user("repo_create"))])
@@ -48,13 +52,13 @@ async def create_repo(body: RepoCreate, auth: AuthUser = Depends(current_user), 
 async def list_repos(limit: int = Query(30, ge=1, le=100), offset: int = Query(0, ge=0, le=10_000),
                      auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
     repos = await ctx.store.list_repos_for_user(auth.id)
-    return [out(r, r["role"]) for r in repos[offset: offset + limit]]
+    return [out(r, r["role"], ctx) for r in repos[offset: offset + limit]]
 
 
 @router.get("/{repo_id}", response_model=RepoOut)
 async def get_repo(repo_id: str, auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
     repo, role = await require(ctx, auth.id, repo_id, "reader", need_storage=False)
-    return out(repo, role)
+    return out(repo, role, ctx)
 
 
 @router.patch("/{repo_id}", response_model=RepoOut)

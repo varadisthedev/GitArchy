@@ -129,7 +129,7 @@ export function LoginForm({ next, expired, signedOut, registered }: { next?: str
 
   return (
     <>
-      {expired ? <Notice tone="info">Your session ended after 30 minutes or was signed out elsewhere. Sign in again to pick up where you left off.</Notice> : null}
+      {expired ? <Notice tone="info">Your session ended after 24 hours or was signed out elsewhere. Sign in again to pick up where you left off.</Notice> : null}
       {signedOut ? <Notice tone="ok">You&apos;re signed out. Your token was revoked on the server.</Notice> : null}
       {registered ? <Notice tone="ok">Account created. Sign in to continue.</Notice> : null}
       <h1 className="text-2xl font-bold tracking-[-0.02em]">Sign in</h1>

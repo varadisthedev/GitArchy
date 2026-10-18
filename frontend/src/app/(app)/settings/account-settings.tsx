@@ -52,7 +52,7 @@ export function AccountSettings() {
       <Section id="st-h" title="Storage" description="Repository bundle downloads are built on the server and stored in object storage. Checked against the bucket itself, not just the configuration.">
         <StorageStatus />
       </Section>
-      <Section id="ses-h" title="Session" description="Sessions last 30 minutes and aren't refreshed. Signing out revokes this session's token on the server.">
+      <Section id="ses-h" title="Session" description="Sessions last 24 hours and aren't refreshed. Signing out revokes this session's token on the server.">
         <SessionInfo />
       </Section>
     </div>
@@ -123,7 +123,7 @@ function AvatarForm() {
     setPreview(URL.createObjectURL(file));
     try {
       await upload.mutateAsync(file);
-    } catch {}
+    } catch { }
     setPreview(null);
     if (input.current) input.current.value = "";
   }
