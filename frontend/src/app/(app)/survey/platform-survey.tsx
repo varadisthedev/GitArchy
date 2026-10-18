@@ -44,10 +44,12 @@ function SurveyPanel({ title, caption, groups, history, pick }: {
   title: string; caption: string; groups: SurveyGroup[]; history: SurveyRun[]; pick: Pick;
 }) {
   const shown = groups.filter((g) => g.count > 0);
-  const trend = history.length > 1 ? toSeries(history, pick) : null;
-  const range = trend
+  // A single measurement is drawn as the flat band it is: one run repeated has nothing to slope
+  // between, so the shape claims no change, and the caption says how many runs are behind it.
+  const trend = toSeries(history.length > 1 ? history : [history[0], history[0]], pick);
+  const range = history.length > 1
     ? ` Measured ${history.length} times, ${fullDate(history[0].measured_at)} to ${fullDate(history[history.length - 1].measured_at)}.`
-    : " One measurement so far — run the survey again and this becomes a trend.";
+    : ` One measurement, ${fullDate(history[0].measured_at)} — run the survey again and the band starts to move.`;
   return (
     <ChartFrame
       title={title}
@@ -59,20 +61,7 @@ function SurveyPanel({ title, caption, groups, history, pick }: {
         { key: "share", label: "Share", numeric: true, format: (v) => pct(Number(v)) },
       ]}
     >
-      {trend ? (
-        <ShareArea data={trend.data} x="_t" series={trend.series} />
-      ) : (
-        <div className="flex h-7 w-full gap-[2px] overflow-hidden rounded-md bg-surface">
-          {shown.map((g) => (
-            <span
-              key={g.label}
-              className="h-full first:rounded-l-md last:rounded-r-md"
-              style={{ width: `${g.share * 100}%`, backgroundColor: colorFor(g.label) }}
-              title={`${g.label} · ${pct(g.share)} · ${g.count.toLocaleString()}`}
-            />
-          ))}
-        </div>
-      )}
+      <ShareArea data={trend.data} x="_t" series={trend.series} />
       <ul className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
         {shown.map((g) => (
           <li key={g.label} className="flex items-baseline gap-2 text-xs">

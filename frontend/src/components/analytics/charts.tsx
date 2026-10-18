@@ -180,9 +180,10 @@ export function StackedColumns<T extends object>({ data, x, series, height = 220
  * Shares over time, stacked into one full band, with each series' latest share called out at the
  * right edge - the shape Steam's hardware survey uses.
  *
- * Needs at least two measurements: a single one has no width to draw, and widening it into a band
- * would chart a stretch of time nothing was measured over. `series` is drawn bottom-up, so pass it
- * largest first and the biggest band sits on the floor.
+ * Two or more rows make a band that moves. A caller with a single measurement passes it twice and
+ * gets the flat band that measurement is - duplicates are kept as separate points, so the shape
+ * spans the width without claiming a slope. `series` is drawn bottom-up, so pass it largest first
+ * and the biggest band sits on the floor.
  */
 export function ShareArea({ data, x, series, height = 190 }: {
   data: Record<string, string | number>[];
