@@ -50,7 +50,7 @@ def remote(tmp_path):
 
 @pytest.fixture
 def ctx(tmp_path):
-    settings = make_settings(tmp_path, github_client_id="cid", github_client_secret="csecret",
+    settings = make_settings(tmp_path, github_oauth_client_id="cid", github_oauth_client_secret="csecret",
                              github_oauth_redirect_uri="http://localhost:3000/auth/github/callback")
     storage = LocalRepositoryStorage(settings.git_repos_dir)
     return Context(settings=settings, store=MemoryStore(), git=GitManager(settings, storage),

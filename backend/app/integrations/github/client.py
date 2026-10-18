@@ -68,7 +68,7 @@ def _request(url: str, *, token: str | None = None, data: dict | None = None,
 # ---------------------------------------------------------------- oauth
 def authorize_url(settings: Settings, state: str, scope: str) -> str:
     q = urllib.parse.urlencode({
-        "client_id": settings.github_client_id,
+        "client_id": settings.github_oauth_client_id,
         "redirect_uri": settings.github_oauth_redirect_uri,
         "scope": scope,
         "state": state,
@@ -81,8 +81,8 @@ def exchange_code(settings: Settings, code: str) -> dict:
     """Authorization code -> user access token. Raises GitHubAuthError on a bad or replayed code."""
     payload = _request(
         f"{settings.github_oauth_base}/login/oauth/access_token",
-        data={"client_id": settings.github_client_id,
-              "client_secret": settings.github_client_secret.get_secret_value(),
+        data={"client_id": settings.github_oauth_client_id,
+              "client_secret": settings.github_oauth_client_secret.get_secret_value(),
               "code": code,
               "redirect_uri": settings.github_oauth_redirect_uri},
         timeout=settings.external_timeout_s,

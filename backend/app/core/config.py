@@ -63,8 +63,8 @@ class Settings(BaseSettings):
     external_timeout_s: float = 10.0
 
     # github oauth (sign-in + repository import). No client id => the feature is off and the routes 503.
-    github_client_id: str = ""
-    github_client_secret: SecretStr = SecretStr("")
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: SecretStr = SecretStr("")
     # Where GitHub sends the user back. Must match the OAuth app exactly and point at the FRONTEND page
     # that forwards ?code/?state to the API, e.g. https://gitarchy.vercel.app/auth/github/callback
     github_oauth_redirect_uri: str = ""
@@ -161,7 +161,7 @@ class Settings(BaseSettings):
 
     @property
     def github_configured(self) -> bool:
-        return all([self.github_client_id, self.github_client_secret.get_secret_value(),
+        return all([self.github_oauth_client_id, self.github_oauth_client_secret.get_secret_value(),
                     self.github_oauth_redirect_uri])
 
     @property

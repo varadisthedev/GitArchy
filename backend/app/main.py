@@ -68,8 +68,8 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
         else:
             log.warning("analytics_disabled", extra={"note": "WORKER_TOKEN not set"})
         missing_github = [n for n, v in (
-            ("GITHUB_CLIENT_ID", settings.github_client_id),
-            ("GITHUB_CLIENT_SECRET", settings.github_client_secret.get_secret_value()),
+            ("GITHUB_OAUTH_CLIENT_ID", settings.github_oauth_client_id),
+            ("GITHUB_OAUTH_CLIENT_SECRET", settings.github_oauth_client_secret.get_secret_value()),
             ("GITHUB_OAUTH_REDIRECT_URI", settings.github_oauth_redirect_uri)) if not v]
         if missing_github:
             log.warning("github_not_configured", extra={"missing": missing_github})
@@ -80,7 +80,7 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
             "env": settings.app_env, "db": st.kind,
             "integrations": {"r2": settings.r2_configured, "cloudinary": settings.cloudinary_configured,
                              "analytics": settings.workers_enabled, "github": settings.github_configured},
-            "github_client_id": settings.github_client_id or None,
+            "github_oauth_client_id": settings.github_oauth_client_id or None,
             "github_redirect_uri": settings.github_oauth_redirect_uri or None,
             "allowed_origins": settings.allowed_origins})
         try:
