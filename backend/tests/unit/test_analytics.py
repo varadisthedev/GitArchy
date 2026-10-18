@@ -102,6 +102,34 @@ def test_end_to_end_with_fake_worker_and_browser_stream(client, alice, repo):
     assert client.app.state.ctx.store.results[repo][0]["job_id"] == job["id"]  # persisted per repo
 
 
+@requires_git
+def test_a_multi_repository_result_is_not_attributed_to_any_one_of_them(client, alice, repo):
+    """Otherwise repository B's figures would show on repository A's page to anyone who can read A."""
+    _, h = alice
+    other = client.post(f"{API}/repositories", headers=h, json={"name": "second"}).json()["id"]
+    body = {"task_type": "commit_activity_rdd", "repo_ids": [repo, other], "params": {}}
+    job = client.post(f"{API}/analytics/jobs", headers=h, json=body).json()
+    store = client.app.state.ctx.store
+    before = {rid: len(store.results.get(rid, [])) for rid in (repo, other)}
+
+    with client.websocket_connect(WS, headers=HDR) as ws:
+        start_worker(ws)
+        ws.receive_json()
+        # a worker claiming the aggregate covers one repository must not change where it lands
+        ws.send_json({"v": 1, "type": "job_completed", "job_id": job["id"],
+                      "result": {"repos": 1, "languages": [{"language": "Python", "bytes": 9,
+                                                            "files": 1, "share": 1.0}]},
+                      "metrics": {}})
+        for _ in range(100):
+            if client.get(f"{API}/analytics/jobs/{job['id']}", headers=h).json()["status"] == "succeeded":
+                break
+            time.sleep(0.05)
+
+    assert {rid: len(store.results.get(rid, [])) for rid in (repo, other)} == before
+    for rid in (repo, other):
+        assert client.get(f"{API}/analytics/repositories/{rid}/languages", headers=h).json()["result"] is None
+
+
 def test_worker_auth(client):
     for headers in ({}, {"Authorization": "Bearer wrong"}, {"Authorization": WORKER_TOKEN}):
         with pytest.raises(WebSocketDisconnect):

@@ -239,11 +239,13 @@ class JobManager:
         metrics = {**msg.metrics, "queue_wait_s": round((started - job["created_at"]).total_seconds(), 2),
                    "wall_s": round((utcnow() - started).total_seconds(), 2), "worker_id": w.id}
         done = await self._set(jid, "succeeded", result=msg.result, metrics=metrics, error=None)
-        if done:
+        if done and len(job["repo_ids"]) == 1:
+            # only a single-repository run is attributable. A job over several produces ONE aggregate,
+            # and storing it against each would show repository B's figures on repository A's page to
+            # anyone who can read A. The job's scope is the server's own record, not the worker's count.
             summary = json.dumps(msg.result, default=str)
-            for rid in job["repo_ids"]:
-                await self.store.add_repo_result(rid, jid, job["task_type"],
-                                                 msg.result if len(summary) < 8000 else {"truncated": True})
+            await self.store.add_repo_result(job["repo_ids"][0], jid, job["task_type"],
+                                             msg.result if len(summary) < 8000 else {"truncated": True})
         await self.schedule()
 
     # ------------------------------------------------------------ watchdog

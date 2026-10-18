@@ -104,8 +104,9 @@ async def repo_languages(repo_id: str, auth: AuthUser = Depends(current_user),
                          ctx: Context = Depends(get_ctx)):
     """The most recent language breakdown computed for THIS repository alone.
 
-    A job covering several repositories stores its aggregate against each of them, which would be a
-    lie on a single repository's page, so only a single-repository run counts here.
+    Attribution is the job manager's job: it records a result against a repository only when that
+    repository was the job's whole scope. The `repos` check below is not a second control - the worker
+    reports that number - it only hides rows written before attribution was narrowed.
     """
     repo, _ = await require(ctx, auth.id, repo_id, "reader", need_storage=False)
     for r in await ctx.store.list_repo_results(repo["id"], 20):
