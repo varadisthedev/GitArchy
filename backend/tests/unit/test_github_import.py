@@ -364,6 +364,18 @@ async def test_the_survey_leaves_private_repositories_out_until_there_is_a_crowd
     assert "devuser" not in json.dumps(data) and repo["id"] not in json.dumps(data)
 
 
+def _fake_git(monkeypatch, ctx):
+    """Give every repository one file and one commit, so only the sampling logic is under test."""
+    async def tree(repo_id, branch, limit):
+        return [{"path": "a.py", "size": 10}]
+
+    async def log(repo_id, branch, limit):
+        return [{"message": "a commit"}]
+
+    monkeypatch.setattr(ctx.git, "tree_files", tree)
+    monkeypatch.setattr(ctx.git, "analytics_log", log)
+
+
 async def test_the_survey_shares_its_cap_between_accounts(ctx, monkeypatch):
     """The floor counts accounts that actually reached the dataset, so the cap must not starve them.
 
@@ -372,6 +384,7 @@ async def test_the_survey_shares_its_cap_between_accounts(ctx, monkeypatch):
     assumes is absent.
     """
     monkeypatch.setattr(datasets, "SURVEY_MAX_REPOS", 4)
+    _fake_git(monkeypatch, ctx)
     hoarder = await _user(ctx, email="hoarder@example.com", github_id=1)
     quiet = await _user(ctx, email="quiet@example.com", github_id=2)
     for owner, n in ((hoarder, 6), (quiet, 2)):
@@ -382,6 +395,32 @@ async def test_the_survey_shares_its_cap_between_accounts(ctx, monkeypatch):
                                          "updated_at": utcnow()})
     job = {"task_type": "platform_survey", "user_id": hoarder.id, "repo_ids": [], "params": {}}
 
-    data = await build_dataset(ctx, job)   # git has no data for these; only the repository rows count
+    data = await build_dataset(ctx, job)
 
     assert data["accounts"] == 2 and len(data["repos"]) == 4   # 2 from each, not 4 from the hoarder
+
+
+async def test_a_crowd_whose_git_data_is_gone_cannot_vouch_for_a_private_repository(ctx, remote, monkeypatch):
+    """The floor must count repositories that contributed data, not repository rows.
+
+    The host wiping its disk is routine here - that is what restore_repo exists for - and a wiped
+    repository silently contributes nothing. Counting it anyway would publish the languages and
+    commit style of the one private repository still readable, with no crowd left around it.
+    """
+    monkeypatch.setattr(datasets, "SURVEY_MIN_ACCOUNTS", 2)
+    _use_local_remote(monkeypatch, ctx, remote)
+    a = await _user(ctx, email="a@example.com", github_id=1)
+    b = await _user(ctx, email="b@example.com", github_id=2)
+    _patch_github(monkeypatch, remote)                       # private
+    await service.import_repo(ctx, a, "devuser/notes")
+    _patch_github(monkeypatch, remote, private=False)        # public
+    public_repo, _ = await service.import_repo(ctx, b, "devuser/notes")
+    job = {"task_type": "platform_survey", "user_id": a.id, "repo_ids": [], "params": {}}
+
+    data = await build_dataset(ctx, job)
+    assert data["accounts"] == 2
+    assert sorted(r["visibility"] for r in data["repos"]) == ["private", "public"]
+
+    ctx.git.delete_repo(public_repo["id"])   # what a Render restart does to the disk
+    with pytest.raises(DatasetError):        # one account left: the private repository drops out
+        await build_dataset(ctx, job)

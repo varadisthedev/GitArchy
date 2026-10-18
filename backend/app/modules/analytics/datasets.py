@@ -47,27 +47,34 @@ async def survey_dataset(ctx: Context) -> dict:
     # and the floor below would then be counting a crowd that contributed nothing to hide behind.
     taken = [(i, r) for row in zip_longest(*by_account) for i, r in enumerate(row) if r is not None]
     taken = taken[:SURVEY_MAX_REPOS]
-    if len({i for i, _ in taken}) < SURVEY_MIN_ACCOUNTS:
-        taken = [(i, r) for i, r in taken if r["visibility"] == "public"]
-    contributors = len({i for i, _ in taken})
-    repos = [r for _, r in taken]
-    if not repos:
-        raise DatasetError("Not enough public repositories from connected GitHub accounts yet")
-    per_repo = max(50, SURVEY_MAX_FILES // len(repos))
-    files: list[dict] = []
-    messages: list[str] = []
-    for repo in repos:
+    per_repo = max(50, SURVEY_MAX_FILES // len(taken))
+
+    # Read Git BEFORE the floor is applied. A repository the host has wiped contributes nothing, so
+    # counting it would let a crowd that is no longer there vouch for a private repository that is.
+    rows = []
+    for i, repo in taken:
         try:
             tree = await ctx.git.tree_files(repo["id"], repo["default_branch"], per_repo)
             log_rows = await ctx.git.analytics_log(repo["id"], repo["default_branch"], SURVEY_COMMITS_PER_REPO)
         except Exception:
             continue  # a repository whose git data is gone simply does not take part
-        files += [{"path": f["path"]} for f in tree]
-        messages += [c["message"] for c in log_rows]
-    return {"kind": "survey", "accounts": contributors,
-            "repos": [{"visibility": r["visibility"]} for r in repos],
+        if tree or log_rows:
+            rows.append((i, repo, [{"path": f["path"]} for f in tree], [c["message"] for c in log_rows]))
+    if not rows:
+        raise DatasetError("No repository with readable Git history to survey yet")
+    if len({i for i, *_ in rows}) < SURVEY_MIN_ACCOUNTS:
+        rows = [row for row in rows if row[1]["visibility"] == "public"]
+        if not rows:
+            raise DatasetError("Not enough public repositories from connected GitHub accounts yet")
+
+    files = [f for *_, fs, _ in rows for f in fs]
+    messages = [m for *_, ms in rows for m in ms]
+    # Truncation takes from the front, and the front is one repository per account (see above), so
+    # neither cap can cut the dataset back below the floor it just cleared.
+    return {"kind": "survey", "accounts": len({i for i, *_ in rows}),
+            "repos": [{"visibility": r["visibility"]} for _, r, _, _ in rows],
             "files": files[:SURVEY_MAX_FILES], "messages": messages[:SURVEY_MAX_MESSAGES],
-            "rows": len(repos)}
+            "rows": len(rows)}
 
 
 async def build_dataset(ctx: Context, job: dict) -> dict:
