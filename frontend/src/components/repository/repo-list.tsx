@@ -5,11 +5,32 @@ import { fullDate, relTime } from "@/lib/format";
 import { RoleChip, VisibilityChip } from "@/components/ui/bits";
 
 /** Dense repository rows. Shows only what the API returns: no invented stars, languages or contributor counts. */
-export function RepoList({ repos, meId, compact = false }: { repos: Repo[]; meId?: string; compact?: boolean }) {
+export function RepoList({
+  repos, meId, compact = false, selected, onToggle,
+}: {
+  repos: Repo[];
+  meId?: string;
+  compact?: boolean;
+  /** Passing both turns on selection. Only repositories you own get a checkbox: only an owner can delete one. */
+  selected?: ReadonlySet<string>;
+  onToggle?: (id: string) => void;
+}) {
   return (
     <ul className="divide-y divide-line-soft">
       {repos.map((r) => (
         <li key={r.id} className="group relative flex items-start gap-3 px-1 py-3 transition-colors hover:bg-surface/40 sm:px-3">
+          {onToggle && r.role === "owner" ? (
+            <input
+              type="checkbox"
+              // z-10: the row's title link covers the whole row via after:inset-0
+              className="relative z-10 mt-1 flex-none"
+              checked={selected?.has(r.id) ?? false}
+              onChange={() => onToggle(r.id)}
+              aria-label={`Select ${r.name}`}
+            />
+          ) : onToggle ? (
+            <span className="mt-0.5 size-4 flex-none" aria-hidden />
+          ) : null}
           <BookMarked className="mt-[3px] size-4 flex-none text-fg-3" aria-hidden />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

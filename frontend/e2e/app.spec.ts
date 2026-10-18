@@ -242,3 +242,25 @@ test("delete the repository behind a typed confirmation", async () => {
   await expect(page).toHaveURL(/\/repositories$/);
   await expect(page.getByText("No repositories yet")).toBeVisible();
 });
+
+test("select several repositories and delete them in one go", async () => {
+  for (const name of [`alpha-${stamp}`, `beta-${stamp}`]) {
+    await page.goto("/repositories/new");
+    await page.getByLabel("Repository name").fill(name);
+    await page.getByRole("button", { name: "Create repository" }).click();
+    await expect(page).toHaveURL(/\/repositories\/[0-9a-f-]{36}$/);
+  }
+
+  await page.goto("/repositories");
+  await page.getByRole("button", { name: /Select all 2 you own/ }).click();
+  await expect(page.getByText("2 selected")).toBeVisible();
+  await page.getByRole("button", { name: "Delete 2" }).click();
+
+  const dialog = page.getByRole("dialog");
+  const confirm = dialog.getByRole("button", { name: "Delete 2" });
+  await expect(confirm).toBeDisabled();            // destructive: never one click away
+  await dialog.getByLabel(/to confirm/).fill("delete");
+  await confirm.click();
+
+  await expect(page.getByText("No repositories yet")).toBeVisible();
+});

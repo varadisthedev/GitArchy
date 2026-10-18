@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useMe, useRepos } from "@/lib/api/queries";
+import { BulkDelete } from "@/components/repository/bulk-delete";
 import { RepoList } from "@/components/repository/repo-list";
 import { EmptyState, ErrorState, PageHeader, SkeletonRows } from "@/components/ui/states";
 
@@ -20,6 +21,7 @@ export function Repositories({ initialQ }: { initialQ: string }) {
   const [vis, setVis] = useState<Vis>("all");
   const [own, setOwn] = useState<Own>("all");
   const [sort, setSort] = useState<Sort>("updated");
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const dq = useDeferredValue(q.trim().toLowerCase());
 
   const list = useMemo(() => {
@@ -37,6 +39,16 @@ export function Repositories({ initialQ }: { initialQ: string }) {
   }, [repos.data, me.data?.id, dq, vis, own, sort]);
 
   const filtered = dq || vis !== "all" || own !== "all";
+  // only an owner can delete, so only owned rows are selectable - and only the ones in view, so a
+  // filter never hides something from the confirmation list
+  const deletable = list.filter((r) => r.role === "owner");
+  const chosen = deletable.filter((r) => picked.has(r.id));
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const next = new Set(p);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   const reset = () => {
     setQ("");
     setVis("all");
@@ -116,7 +128,30 @@ export function Repositories({ initialQ }: { initialQ: string }) {
           Nothing matches those filters.
         </EmptyState>
       ) : null}
-      {list.length ? <RepoList repos={list} meId={me.data?.id} /> : null}
+      {deletable.length ? (
+        <div className="mb-1 flex items-center gap-3 text-2xs">
+          <button
+            className="font-semibold text-fg-2 hover:text-fg"
+            onClick={() => setPicked(chosen.length === deletable.length ? new Set() : new Set(deletable.map((r) => r.id)))}
+          >
+            {chosen.length === deletable.length ? "Clear selection" : `Select all ${deletable.length} you own`}
+          </button>
+        </div>
+      ) : null}
+      {list.length ? <RepoList repos={list} meId={me.data?.id} selected={picked} onToggle={toggle} /> : null}
+      {chosen.length ? (
+        <BulkDelete
+          repos={chosen}
+          onClear={() => setPicked(new Set())}
+          onDone={(deleted) =>
+            setPicked((p) => {
+              const next = new Set(p);
+              for (const id of deleted) next.delete(id);
+              return next;
+            })
+          }
+        />
+      ) : null}
     </div>
   );
 }
