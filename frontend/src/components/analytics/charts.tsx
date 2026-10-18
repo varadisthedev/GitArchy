@@ -3,7 +3,7 @@
 import { BarChart3, Table2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
-  Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
   type TooltipContentProps,
 } from "recharts";
 
@@ -84,7 +84,8 @@ export function ChartFrame<T extends object>({
   );
 }
 
-function Tip({ active, payload, label, unit }: TooltipContentProps<number, string> & { unit?: (name: string) => string }) {
+function Tip({ active, payload, label, unit, format }: TooltipContentProps<number, string>
+  & { unit?: (name: string) => string; format?: (v: number) => string }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-md border border-[#474545] bg-raised px-2.5 py-2 text-2xs shadow-[0_8px_24px_-6px_rgb(0_0_0/0.6)]">
@@ -93,7 +94,7 @@ function Tip({ active, payload, label, unit }: TooltipContentProps<number, strin
         <p key={String(p.dataKey)} className="flex items-center gap-2 text-fg-2">
           <span aria-hidden className="size-2 rounded-[2px]" style={{ background: p.color ?? p.payload?.fill }} />
           <span>{p.name}</span>
-          <span className="ml-auto pl-3 font-mono text-fg tabular">{Math.abs(Number(p.value)).toLocaleString()}{unit ? ` ${unit(String(p.name))}` : ""}</span>
+          <span className="ml-auto pl-3 font-mono text-fg tabular">{format ? format(Number(p.value)) : Math.abs(Number(p.value)).toLocaleString()}{unit ? ` ${unit(String(p.name))}` : ""}</span>
         </p>
       ))}
     </div>
@@ -171,5 +172,60 @@ export function StackedColumns<T extends object>({ data, x, series, height = 220
         ))}
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+
+/**
+ * Shares over time, stacked into one full band, with each series' latest share called out at the
+ * right edge - the shape Steam's hardware survey uses.
+ *
+ * Needs at least two measurements: a single one has no width to draw, and widening it into a band
+ * would chart a stretch of time nothing was measured over. `series` is drawn bottom-up, so pass it
+ * largest first and the biggest band sits on the floor.
+ */
+export function ShareArea({ data, x, series, height = 190 }: {
+  data: Record<string, string | number>[];
+  x: string;
+  series: { key: string; label: string; color: string }[];
+  height?: number;
+}) {
+  const last = data[data.length - 1] ?? {};
+  // Each label sits at the middle of its own band. The first sits on the floor and every later one
+  // is nudged up until it clears the one below by 14px, because a 1% band is thinner than the text
+  // naming it - Steam's chart crowds the same way.
+  const marks = series.reduce<{ key: string; color: string; share: number; top: number }[]>((acc, s) => {
+    const share = Number(last[s.key] ?? 0);
+    const below = acc.reduce((n, m) => n + m.share, 0);
+    const middle = (1 - (below + share / 2)) * height;
+    const prev = acc[acc.length - 1];
+    acc.push({ key: s.key, color: s.color, share, top: prev ? Math.min(middle, prev.top - 14) : middle });
+    return acc;
+  }, []);
+
+  return (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        <ResponsiveContainer width="100%" height={height}>
+          <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <XAxis dataKey={x} hide />
+            <YAxis domain={[0, 1]} hide />
+            <Tooltip content={(p) => <Tip {...(p as TooltipContentProps<number, string>)} format={(v) => `${(v * 100).toFixed(1)}%`} />} />
+            {series.map((s) => (
+              <Area key={s.key} dataKey={s.key} name={s.label} stackId="a" type="linear"
+                stroke={s.color} fill={s.color} fillOpacity={1} strokeWidth={0} isAnimationActive={false} />
+            ))}
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="relative w-12 flex-none" style={{ height }} aria-hidden>
+        {marks.filter((m) => m.share > 0).map((m) => (
+          <span key={m.key} className="absolute right-0 font-mono text-2xs tabular"
+            style={{ top: Math.max(0, m.top), transform: "translateY(-50%)", color: m.color }}>
+            {(m.share * 100).toFixed(2)}%
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

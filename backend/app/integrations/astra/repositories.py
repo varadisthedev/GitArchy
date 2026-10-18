@@ -429,16 +429,19 @@ class AstraStore:
         return [{"user_id": str(r["user_id"]), "login": r["login"] or ""} for r in rows]
 
     async def save_survey(self, job_id: str, result: dict) -> None:
-        await self._x("INSERT INTO platform_survey (bucket, job_id, result, measured_at) VALUES (?, ?, ?, ?)",
-                      (_BUCKET, _u(job_id), json.dumps(result), utcnow()))
+        await self._x("INSERT INTO platform_survey_history (bucket, measured_at, job_id, result) "
+                      "VALUES (?, ?, ?, ?)", (_BUCKET, utcnow(), _u(job_id), json.dumps(result)))
+
+    async def list_surveys(self, limit: int) -> list[dict]:
+        """Newest first - the clustering order, so this is a read of the partition head."""
+        rows = await self._x("SELECT * FROM platform_survey_history WHERE bucket = ? LIMIT ?",
+                             (_BUCKET, limit))
+        return [{"job_id": str(r["job_id"]), "result": json.loads(r["result"]),
+                 "measured_at": _ts(r["measured_at"])} for r in rows]
 
     async def get_survey(self) -> dict | None:
-        rows = await self._x("SELECT * FROM platform_survey WHERE bucket = ?", (_BUCKET,))
-        if not rows:
-            return None
-        r = rows[0]
-        return {"job_id": str(r["job_id"]), "result": json.loads(r["result"]),
-                "measured_at": _ts(r["measured_at"])}
+        rows = await self.list_surveys(1)
+        return rows[0] if rows else None
 
     async def list_repo_results(self, repo_id: str, limit: int) -> list[dict]:
         rows = await self._x("SELECT * FROM analytics_results_by_repo WHERE repo_id = ? LIMIT ?",

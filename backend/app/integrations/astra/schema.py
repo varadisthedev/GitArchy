@@ -91,6 +91,15 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         """CREATE TABLE IF NOT EXISTS platform_survey (
             bucket int PRIMARY KEY, job_id uuid, result text, measured_at timestamp)""",
     ]),
+    (6, "survey history", [
+        # Supersedes platform_survey, which kept only the newest row and so could never be charted
+        # over time. Clustered newest-first, in one bounded partition: a survey is a manual act, so
+        # this grows by a row per run, not per request.
+        """CREATE TABLE IF NOT EXISTS platform_survey_history (
+            bucket int, measured_at timestamp, job_id uuid, result text,
+            PRIMARY KEY ((bucket), measured_at))
+            WITH CLUSTERING ORDER BY (measured_at DESC)""",
+    ]),
 ]
 
 VERSION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (

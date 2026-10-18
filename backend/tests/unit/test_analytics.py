@@ -1,4 +1,5 @@
 """Analytics job lifecycle, worker protocol and failure handling."""
+import asyncio
 import time
 import uuid
 
@@ -356,3 +357,23 @@ async def test_global_concurrency_cap(tmp_path):
     await jm.register(b)
     await jm.schedule()
     assert sum(1 for w in (a, b) if w.job_id) == 1
+
+
+def test_survey_endpoint_serves_the_history_oldest_first(client, alice):
+    """The chart reads left to right; the store clusters newest first. One of them has to turn round.
+
+    Also pins the endpoint shape the page depends on, and that it needs a signed-in reader.
+    """
+    _, h = alice
+    assert client.get(f"{API}/analytics/survey").status_code == 401
+
+    store = client.app.state.ctx.store
+    for n in (1, 2, 3):
+        asyncio.run(store.save_survey(str(uuid.uuid4()), {"accounts": n, "repos": n, "files": n,
+                                                          "commits": n, "languages": [], "visibility": [],
+                                                          "message_lengths": []}))
+    body = client.get(f"{API}/analytics/survey", headers=h).json()
+
+    assert body["result"]["accounts"] == 3                                  # newest is the headline
+    assert [r["result"]["accounts"] for r in body["history"]] == [1, 2, 3]   # oldest first for the chart
+    assert body["measured_at"] == body["history"][-1]["measured_at"]

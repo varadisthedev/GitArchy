@@ -264,10 +264,15 @@ export interface SurveyResult {
   visibility: SurveyGroup[];
   message_lengths: SurveyGroup[];
 }
+export interface SurveyRun {
+  measured_at: string;
+  result: SurveyResult;
+}
 export interface Survey {
   result: SurveyResult | null;
   job_id: string | null;
   measured_at: string | null;
+  history: SurveyRun[];
   worker_available: boolean;
 }
 

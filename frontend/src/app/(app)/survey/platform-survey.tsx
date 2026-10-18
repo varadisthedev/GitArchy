@@ -3,27 +3,56 @@
 import { Globe2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useSubmitJob, useSurvey } from "@/lib/api/queries";
-import type { SurveyGroup } from "@/lib/api/types";
+import type { SurveyGroup, SurveyResult, SurveyRun } from "@/lib/api/types";
 import { fullDate, plural, relTime } from "@/lib/format";
-import { ChartFrame } from "@/components/analytics/charts";
+import { ChartFrame, ShareArea } from "@/components/analytics/charts";
 import { colorFor } from "@/components/analytics/language-bar";
 import { EmptyState, ErrorState, PageHeader, SkeletonRows } from "@/components/ui/states";
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
+type Pick = (r: SurveyResult) => SurveyGroup[];
+
 /**
- * One metric as a single proportional bar, in the shape Steam's hardware survey uses.
+ * The history as one stacked band per label, oldest run on the left.
  *
- * Shares are a snapshot of the platform as it stands. There is no time axis because there is no
- * history to draw one from: the tree of a repository six months ago was never recorded, and a
- * monthly series built from today's files would be a chart of something that never happened.
+ * Labels are taken from every run, not just the newest, so a language that has since dropped out
+ * still holds its place on the left and the band keeps summing to the whole. They are ordered by
+ * their share in the newest run, which puts the biggest on the floor of the stack.
  */
-function SurveyBar({ title, caption, groups }: { title: string; caption: string; groups: SurveyGroup[] }) {
+export function toSeries(history: SurveyRun[], pick: Pick) {
+  const latest = new Map(pick(history[history.length - 1].result).map((g) => [g.label, g.share]));
+  const labels = [...new Set(history.flatMap((h) => pick(h.result).map((g) => g.label)))]
+    .sort((a, b) => (latest.get(b) ?? 0) - (latest.get(a) ?? 0));
+  const data = history.map((h) => {
+    const by = new Map(pick(h.result).map((g) => [g.label, g.share]));
+    return Object.fromEntries([["_t", fullDate(h.measured_at)],
+      ...labels.map((l) => [l, by.get(l) ?? 0])]) as Record<string, string | number>;
+  });
+  return { data, series: labels.map((l) => ({ key: l, label: l, color: colorFor(l) })) };
+}
+
+/**
+ * One metric in the shape Steam's hardware survey uses: shares stacked into a full band, each
+ * series' latest value called out at the right edge.
+ *
+ * A survey is a snapshot - nobody recorded what these repositories looked like six months ago - so
+ * the series is of measurements taken, not of months passed, and the first run has nothing to
+ * stretch across. Until there are two, the same shares are drawn as the single bar they are.
+ */
+function SurveyPanel({ title, caption, history, pick }: {
+  title: string; caption: string; history: SurveyRun[]; pick: Pick;
+}) {
+  const groups = pick(history[history.length - 1].result);
   const shown = groups.filter((g) => g.count > 0);
+  const trend = history.length > 1 ? toSeries(history, pick) : null;
+  const range = trend
+    ? ` Measured ${history.length} times, ${fullDate(history[0].measured_at)} to ${fullDate(history[history.length - 1].measured_at)}.`
+    : " One measurement so far — run the survey again and this becomes a trend.";
   return (
     <ChartFrame
       title={title}
-      caption={caption}
+      caption={caption + range}
       rows={groups}
       cols={[
         { key: "label", label: "Group" },
@@ -31,16 +60,20 @@ function SurveyBar({ title, caption, groups }: { title: string; caption: string;
         { key: "share", label: "Share", numeric: true, format: (v) => pct(Number(v)) },
       ]}
     >
-      <div className="flex h-7 w-full gap-[2px] overflow-hidden rounded-md bg-surface">
-        {shown.map((g) => (
-          <span
-            key={g.label}
-            className="h-full first:rounded-l-md last:rounded-r-md"
-            style={{ width: `${g.share * 100}%`, backgroundColor: colorFor(g.label) }}
-            title={`${g.label} · ${pct(g.share)} · ${g.count.toLocaleString()}`}
-          />
-        ))}
-      </div>
+      {trend ? (
+        <ShareArea data={trend.data} x="_t" series={trend.series} />
+      ) : (
+        <div className="flex h-7 w-full gap-[2px] overflow-hidden rounded-md bg-surface">
+          {shown.map((g) => (
+            <span
+              key={g.label}
+              className="h-full first:rounded-l-md last:rounded-r-md"
+              style={{ width: `${g.share * 100}%`, backgroundColor: colorFor(g.label) }}
+              title={`${g.label} · ${pct(g.share)} · ${g.count.toLocaleString()}`}
+            />
+          ))}
+        </div>
+      )}
       <ul className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
         {shown.map((g) => (
           <li key={g.label} className="flex items-baseline gap-2 text-xs">
@@ -61,6 +94,10 @@ export function PlatformSurvey() {
   const [started, setStarted] = useState(false);
   const data = survey.data;
   const r = data?.result ?? null;
+  // a result cached before histories were kept still charts, as the one run it is
+  const history: SurveyRun[] = data?.history?.length
+    ? data.history
+    : r && data?.measured_at ? [{ measured_at: data.measured_at, result: r }] : [];
 
   const refresh = () => {
     setStarted(true);
@@ -120,21 +157,24 @@ export function PlatformSurvey() {
 
           <div className="grid gap-x-12 gap-y-10 lg:grid-cols-2">
             <div className="lg:col-span-2">
-              <SurveyBar
+              <SurveyPanel
                 title="Most popular languages"
                 caption={`Counted by how many of the ${plural(r.files, "file")} carry each extension, not by weight — so a one-line stylesheet counts the same as a trained model.`}
-                groups={r.languages}
+                history={history}
+                pick={(x) => x.languages}
               />
             </div>
-            <SurveyBar
+            <SurveyPanel
               title="Public or private"
               caption={`Across ${plural(r.repos, "repository", "repositories")}. Counted blind: the survey never records which account owns which repository.`}
-              groups={r.visibility}
+              history={history}
+              pick={(x) => x.visibility}
             />
-            <SurveyBar
+            <SurveyPanel
               title="Commit message length"
               caption={`Subject line only, over ${plural(r.commits, "commit")} — a body is not measured. Git convention asks for 50 characters and hard-wraps at 72.`}
-              groups={r.message_lengths}
+              history={history}
+              pick={(x) => x.message_lengths}
             />
           </div>
 

@@ -36,7 +36,7 @@ class MemoryStore:
         self.branches: dict[str, dict[str, dict]] = {}
         self.jobs: dict[str, dict] = {}
         self.results: dict[str, list[dict]] = {}
-        self.survey: dict | None = None
+        self.surveys: list[dict] = []
         self._seq = 0
 
     async def ping(self) -> bool:
@@ -110,10 +110,13 @@ class MemoryStore:
         return [{"user_id": uid, "login": i.get("login") or ""} for uid, i in self.github.items()]
 
     async def save_survey(self, job_id: str, result: dict) -> None:
-        self.survey = {"job_id": job_id, "result": result, "measured_at": utcnow()}
+        self.surveys.insert(0, {"job_id": job_id, "result": result, "measured_at": utcnow()})
+
+    async def list_surveys(self, limit: int) -> list[dict]:
+        return [dict(s) for s in self.surveys[:limit]]
 
     async def get_survey(self) -> dict | None:
-        return dict(self.survey) if self.survey else None
+        return dict(self.surveys[0]) if self.surveys else None
 
     # ---- token revocation ----
     async def revoke_token(self, jti: str, ttl_s: int) -> None:

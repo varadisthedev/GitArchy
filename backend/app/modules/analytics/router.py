@@ -15,6 +15,7 @@ from app.utils.validators import InvalidInput, parse_uuid
 
 log = logging.getLogger("gitarchey.analytics")
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+SURVEY_HISTORY = 24  # runs charted on /survey; a survey is a manual act, so this is months of them
 
 
 class JobCreate(BaseModel):
@@ -131,10 +132,13 @@ async def survey(auth: AuthUser = Depends(current_user), ctx: Context = Depends(
     signed-in reader may see it. Signed-in, though: figures drawn from every connected account are
     not the anonymous internet's to read, and `auth` is what makes the sentence above true.
     """
-    cached = await ctx.store.get_survey()
-    return {"result": cached["result"] if cached else None,
-            "job_id": cached["job_id"] if cached else None,
-            "measured_at": cached["measured_at"] if cached else None,
+    runs = await ctx.store.list_surveys(SURVEY_HISTORY)
+    newest = runs[0] if runs else None
+    return {"result": newest["result"] if newest else None,
+            "job_id": newest["job_id"] if newest else None,
+            "measured_at": newest["measured_at"] if newest else None,
+            # oldest first: the shape a chart reads left to right
+            "history": [{"measured_at": r["measured_at"], "result": r["result"]} for r in reversed(runs)],
             "worker_available": bool(ctx.jobs and ctx.jobs.worker_available)}
 
 
