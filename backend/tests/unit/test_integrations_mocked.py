@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 from PIL import Image
 
 from app.core.config import Settings
@@ -116,6 +117,25 @@ async def test_r2_status_is_single_flight(tmp_path, s3):
     r2 = R2Client(r2_settings(tmp_path), s3=s3)
     assert await asyncio.gather(*(r2.status() for _ in range(5))) == ["ok"] * 5
     assert sum(c[0] == "head_bucket" for c in s3.calls) == 1
+
+
+async def test_r2_status_accepts_an_object_scoped_token(tmp_path, s3):
+    """A token scoped to objects is refused HeadBucket but uploads fine: that must not read as "down"."""
+    def denied(Bucket):
+        raise ClientError({"Error": {"Code": "AccessDenied"}}, "HeadBucket")
+
+    def missing_key(Bucket, Key):
+        raise ClientError({"Error": {"Code": "404"}}, "HeadObject")
+
+    s3.head_bucket, s3.head_object = denied, missing_key
+    r2 = R2Client(r2_settings(tmp_path), s3=s3)
+    assert await r2.status() == "ok"
+
+    def no_bucket(Bucket, Key):   # a wrong bucket name must still fail
+        raise ClientError({"Error": {"Code": "NoSuchBucket"}}, "HeadObject")
+
+    s3.head_object = no_bucket
+    assert await r2.status(ttl=0) == "unavailable"
 
 
 def test_r2_endpoint_derivation(tmp_path):

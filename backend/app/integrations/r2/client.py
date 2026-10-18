@@ -1,15 +1,24 @@
 """Filebase or Cloudflare R2 through its S3-compatible API (boto3). Object storage only - never a live Git filesystem."""
 import asyncio
 import hashlib
+import logging
 import time
 from pathlib import Path
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 from app.core.config import Settings
 
+log = logging.getLogger("gitarchey.r2")
+
 MAX_PRESIGN_SECONDS = 900
+PROBE_KEY = ".gitarchey-probe"   # never written; only its absence is read
+
+
+def _code(e: ClientError) -> str:
+    return str(e.response.get("Error", {}).get("Code", ""))
 
 
 def sha256_file(path: Path) -> str:
@@ -29,6 +38,7 @@ class R2Client:
             endpoint = settings.r2_endpoint_url or f"https://{settings.r2_account_id}.r2.cloudflarestorage.com"
             region, key_id, self.bucket = "auto", settings.r2_access_key_id, settings.r2_bucket_name
             secret = settings.r2_secret_access_key.get_secret_value()
+        self.endpoint = endpoint
         self._timeout = settings.external_timeout_s
         self._checked_at: float | None = None  # None, not 0.0: time.monotonic() may start above any ttl
         self._status = "unavailable"
@@ -43,7 +53,23 @@ class R2Client:
         return await asyncio.to_thread(lambda: fn(*a, **kw))
 
     async def ping(self) -> bool:
-        await self._t(self.s3.head_bucket, Bucket=self.bucket)
+        """Prove the bucket answers us with these credentials.
+
+        HeadBucket needs bucket-level permission, which an R2 or Filebase token scoped to objects does not
+        have. A 403 there says nothing about whether uploads work, so it falls back to a HEAD on a key that
+        does not exist: 404 means the credentials were accepted and the bucket resolved, which is exactly
+        what an upload needs. A wrong bucket name answers NoSuchBucket, not 404, so it still fails.
+        """
+        try:
+            await self._t(self.s3.head_bucket, Bucket=self.bucket)
+        except ClientError as e:
+            if _code(e) not in ("403", "AccessDenied", "Forbidden"):
+                raise
+            try:
+                await self._t(self.s3.head_object, Bucket=self.bucket, Key=PROBE_KEY)
+            except ClientError as inner:
+                if _code(inner) not in ("404", "NoSuchKey", "NotFound"):
+                    raise
         return True
 
     async def status(self, ttl: float = 60.0) -> str:
@@ -62,7 +88,10 @@ class R2Client:
             try:
                 await asyncio.wait_for(self.ping(), self._timeout)
                 self._status = "ok"
-            except Exception:  # credentials rejected, bucket gone, endpoint unreachable: all "unavailable"
+            except Exception as e:  # credentials rejected, bucket gone, endpoint unreachable
+                # the UI can only say "unreachable"; the operator needs to know which of those it was
+                log.warning("storage_probe_failed", extra={"bucket": self.bucket, "endpoint": self.endpoint,
+                                                           "error": f"{type(e).__name__}: {e}"[:300]})
                 self._status = "unavailable"
             self._checked_at = time.monotonic()
             return self._status
