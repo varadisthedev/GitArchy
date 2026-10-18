@@ -141,6 +141,42 @@ async def test_restore_reclones_a_repository_whose_disk_was_wiped(ctx, remote, m
         await service.restore_repo(ctx, auth, repo["id"])
 
 
+async def test_restore_applies_the_same_size_limit_as_import(ctx, remote, monkeypatch):
+    """A repository can grow past the limit after it was imported; restore must not clone it anyway."""
+    _patch_github(monkeypatch, remote)
+    _use_local_remote(monkeypatch, ctx, remote)
+    auth = await _user(ctx)
+    repo, _ = await service.import_repo(ctx, auth, "devuser/notes")
+    ctx.git.delete_repo(repo["id"])
+
+    _patch_github(monkeypatch, remote, size_kb=ctx.settings.github_max_repo_kb + 1)
+    with pytest.raises(InvalidInput):
+        await service.restore_repo(ctx, auth, repo["id"])
+    assert not ctx.storage.exists(repo["id"])   # refused before git was handed anything
+
+
+async def test_restore_stays_retryable_when_indexing_fails(ctx, remote, monkeypatch):
+    _patch_github(monkeypatch, remote)
+    _use_local_remote(monkeypatch, ctx, remote)
+    auth = await _user(ctx)
+    repo, _ = await service.import_repo(ctx, auth, "devuser/notes")
+    ctx.git.delete_repo(repo["id"])
+
+    async def boom(*a, **kw):
+        raise RuntimeError("cassandra is down")
+
+    monkeypatch.setattr(ctx.store, "index_branch", boom)
+    with pytest.raises(RuntimeError):
+        await service.restore_repo(ctx, auth, repo["id"])
+    # the clone is gone, so the next attempt is a clean restore rather than Conflict(storage_present)
+    assert not ctx.storage.exists(repo["id"])
+    monkeypatch.undo()
+    _patch_github(monkeypatch, remote)
+    _use_local_remote(monkeypatch, ctx, remote)
+    await service.restore_repo(ctx, auth, repo["id"])
+    assert ctx.storage.exists(repo["id"])
+
+
 async def test_restore_refuses_a_repository_that_was_never_imported(ctx, monkeypatch):
     auth = await _user(ctx)
     repo = {"id": str(uuid.uuid4()), "owner_id": auth.id, "name": "handmade", "description": "",

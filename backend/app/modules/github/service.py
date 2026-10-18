@@ -189,15 +189,7 @@ async def import_repo(ctx: Context, auth: AuthUser, full_name: str,
     the metadata row and the partial clone are both removed, so a retry is always clean."""
     ident = await _identity(ctx, auth.id)
     gh = await asyncio.to_thread(client.get_repo, ctx.settings, ident["access_token"], full_name)
-    if gh["empty"]:
-        raise InvalidInput("That repository is empty, so there is nothing to import", code="remote_empty")
-    if gh["size_kb"] > ctx.settings.github_max_repo_kb:
-        raise InvalidInput(
-            f"That repository is {gh['size_kb'] // 1024} MB, over this server's "
-            f"{ctx.settings.github_max_repo_kb // 1024} MB import limit", code="repo_too_large")
-    if not gh["clone_url"].startswith("https://"):
-        # GitHub always answers https; anything else means we are not talking to GitHub
-        raise InvalidInput("That repository has an unsupported clone URL", code="unsupported_clone_url")
+    _vet_clone(ctx, gh)
     try:
         branch = validate_branch(gh["default_branch"])
     except InvalidInput:
@@ -248,15 +240,36 @@ async def restore_repo(ctx: Context, auth: AuthUser, repo_id: str) -> tuple[dict
         raise Conflict("This repository's Git data is already on the server", code="storage_present")
     ident = await _identity(ctx, auth.id)
     gh = await asyncio.to_thread(client.get_repo, ctx.settings, ident["access_token"], repo["source"])
-    if not gh["clone_url"].startswith("https://"):  # same trust boundary as import
-        raise InvalidInput("That repository has an unsupported clone URL", code="unsupported_clone_url")
+    # the same limits as an import: the repository on GitHub is whatever it is TODAY, which can be far
+    # past the size that was allowed in, and this clone lands on the same small disk
+    _vet_clone(ctx, gh)
     head = await ctx.git.clone_bare(repo["id"], gh["clone_url"], ident["access_token"])
-    if head != repo["default_branch"]:
-        repo = await ctx.store.update_repo(repo["id"], default_branch=head, updated_at=utcnow())
-    summary = await _index_import(ctx, auth, repo, gh, event="repo.restored")
+    try:
+        if head != repo["default_branch"]:
+            repo = await ctx.store.update_repo(repo["id"], default_branch=head, updated_at=utcnow())
+        summary = await _index_import(ctx, auth, repo, gh, event="repo.restored")
+    except Exception:
+        # drop the clone, keep the repository: a half-indexed restore must stay retryable, and
+        # leaving storage in place would make the next attempt raise storage_present instead
+        ctx.git.delete_repo(repo["id"])
+        raise
     log.info("github_repo_restored", extra={"repo_id": repo["id"], "user_id": auth.id,
                                             "source": repo["source"]})
     return repo, summary
+
+
+def _vet_clone(ctx: Context, gh: dict) -> None:
+    """What must hold before we hand a URL to git. Import and restore share it: a repository that
+    could not be imported today must not arrive through restore either."""
+    if gh["empty"]:
+        raise InvalidInput("That repository is empty, so there is nothing to clone", code="remote_empty")
+    if gh["size_kb"] > ctx.settings.github_max_repo_kb:
+        raise InvalidInput(
+            f"That repository is {gh['size_kb'] // 1024} MB, over this server's "
+            f"{ctx.settings.github_max_repo_kb // 1024} MB limit", code="repo_too_large")
+    if not gh["clone_url"].startswith("https://"):
+        # GitHub always answers https; anything else means we are not talking to GitHub
+        raise InvalidInput("That repository has an unsupported clone URL", code="unsupported_clone_url")
 
 
 async def _claim_name(ctx: Context, repo: dict) -> None:
