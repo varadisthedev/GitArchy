@@ -51,10 +51,13 @@ def create_app(settings: Settings | None = None, store=None) -> FastAPI:
         log.info("git_ready", extra={"version": await asyncio.to_thread(git.version)})  # fails fast if git missing
         ctx = Context(settings=settings, store=st, git=git, storage=storage, limiter=Limiter(settings))
         if settings.r2_configured:
+            from app.integrations.git.mirror import RepoMirror
             from app.integrations.r2.client import R2Client
             ctx.r2 = R2Client(settings)
+            # object storage holds every repository; this instance's disk is a cache of it
+            git.mirror = RepoMirror(ctx.r2, st, storage)
         else:
-            log.warning("r2_not_configured")
+            log.warning("r2_not_configured", extra={"note": "repositories live on local disk only"})
         if settings.cloudinary_configured:
             from app.integrations.cloudinary.client import CloudinaryClient
             ctx.cloudinary = CloudinaryClient(settings)

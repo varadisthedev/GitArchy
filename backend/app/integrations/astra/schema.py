@@ -75,6 +75,13 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         # recorded here a wiped disk leaves a repository that can never be rebuilt, only deleted.
         """ALTER TABLE repositories_by_id ADD source text""",
     ]),
+    (4, "durable copy of each repository in object storage", [
+        # Git needs a filesystem, so the instance's disk holds a working copy and object storage holds
+        # the truth. These say which object and what it should hash to.
+        """ALTER TABLE repositories_by_id ADD storage_key text""",
+        """ALTER TABLE repositories_by_id ADD storage_sha text""",
+        """ALTER TABLE repositories_by_id ADD storage_at timestamp""",
+    ]),
 ]
 
 VERSION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (

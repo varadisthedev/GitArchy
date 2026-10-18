@@ -21,7 +21,8 @@ from app.integrations.astra.memory import month_bucket, utcnow
 log = logging.getLogger("gitarchey.astra")
 
 USER_COLS = {"display_name", "avatar_url", "avatar_public_id", "password_hash"}
-REPO_COLS = {"description", "visibility", "default_branch", "updated_at"}
+REPO_COLS = {"description", "visibility", "default_branch", "updated_at",
+             "storage_key", "storage_sha", "storage_at"}
 JOB_COLS = {"status", "attempts", "error", "result", "metrics", "updated_at", "started_at", "finished_at"}
 JSON_JOB = {"result", "metrics"}
 
@@ -199,7 +200,10 @@ class AstraStore:
                 "default_branch": r["default_branch"], "created_at": _ts(r["created_at"]),
                 "updated_at": _ts(r["updated_at"]),
                 # "owner/name" on GitHub for an imported repository, else None
-                "source": r.get("source")}
+                "source": r.get("source"),
+                # the durable copy: which object holds this repository and what it hashes to
+                "storage_key": r.get("storage_key"), "storage_sha": r.get("storage_sha"),
+                "storage_at": _ts(r.get("storage_at"))}
 
     async def create_repo(self, r: dict) -> None:
         rid, oid, name = _u(r["id"]), _u(r["owner_id"]), r["name"].lower()

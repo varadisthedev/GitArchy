@@ -122,6 +122,11 @@ class R2Client:
         res = await self._t(self.s3.get_object, Bucket=self.bucket, Key=key)
         return await self._t(res["Body"].read)
 
+    async def download_file(self, key: str, dest: Path) -> int:
+        """Stream an object to disk. Repository snapshots are far too big to hold in memory."""
+        await self._t(self.s3.download_file, self.bucket, key, str(dest))
+        return dest.stat().st_size
+
     async def delete(self, key: str) -> None:
         await self._t(self.s3.delete_object, Bucket=self.bucket, Key=key)
 

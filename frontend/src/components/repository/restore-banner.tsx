@@ -6,9 +6,9 @@ import type { Repo } from "@/lib/api/types";
 import { InlineError, Spinner } from "@/components/ui/states";
 
 /**
- * Shown when Cassandra still has the repository but the server's disk no longer has its Git data —
- * what a restart does to an ephemeral disk. Every Git-backed route answers 503 in that state, so the
- * repository looks broken; an imported one can be re-cloned from the origin recorded at import.
+ * Only for a repository with no Git data anywhere: not on this instance, and not in object storage.
+ * A repository that is merely absent from this instance is restored automatically on the next read,
+ * so it never reaches here. This state is unrecoverable except from the origin it was imported from.
  */
 export function RestoreBanner({ repo }: { repo: Repo }) {
   const restore = useRestoreRepo(repo.id);
@@ -22,9 +22,9 @@ export function RestoreBanner({ repo }: { repo: Repo }) {
         This repository&apos;s files aren&apos;t on the server
       </p>
       <p className="mt-1.5 max-w-[72ch] text-xs text-fg-2">
-        Its details, members and history index are safe in the database, but the Git data is gone — the
-        host&apos;s disk doesn&apos;t survive restarts. Files, commits, branches and analytics stay
-        unavailable until it&apos;s back.
+        Its details, members and history index are safe in the database, but there&apos;s no copy of the
+        Git data in object storage either — it predates durable storage, or was never stored. Files,
+        commits, branches and analytics stay unavailable until it&apos;s back.
       </p>
       {canRestore ? (
         <>

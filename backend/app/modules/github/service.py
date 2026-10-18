@@ -209,7 +209,7 @@ async def import_repo(ctx: Context, auth: AuthUser, full_name: str,
         head = await ctx.git.clone_bare(repo["id"], gh["clone_url"], ident["access_token"])
     except Exception:
         await ctx.store.delete_repo(repo["id"])  # never leave a phantom repository or a blocked name
-        ctx.git.delete_repo(repo["id"])
+        await ctx.git.forget(repo["id"])
         raise
     try:
         if head != repo["default_branch"]:  # trust the clone's HEAD over the API's default_branch
@@ -217,7 +217,7 @@ async def import_repo(ctx: Context, auth: AuthUser, full_name: str,
         summary = await _index_import(ctx, auth, repo, gh)
     except Exception:
         await ctx.store.delete_repo(repo["id"])
-        ctx.git.delete_repo(repo["id"])
+        await ctx.git.forget(repo["id"])
         raise
     log.info("github_repo_imported", extra={"repo_id": repo["id"], "user_id": auth.id,
                                             "source": gh["full_name"]})
@@ -236,8 +236,10 @@ async def restore_repo(ctx: Context, auth: AuthUser, repo_id: str) -> tuple[dict
     if not repo.get("source"):
         raise InvalidInput("This repository wasn't imported from GitHub, so there is nothing to restore it from",
                            code="no_source")
-    if ctx.storage.exists(repo["id"]):
-        raise Conflict("This repository's Git data is already on the server", code="storage_present")
+    if ctx.storage.exists(repo["id"]) or repo.get("storage_key"):
+        # a stored copy is restored automatically on the next read; re-cloning would only risk
+        # replacing what is already here with whatever GitHub holds today
+        raise Conflict("This repository's Git data is already available", code="storage_present")
     ident = await _identity(ctx, auth.id)
     gh = await asyncio.to_thread(client.get_repo, ctx.settings, ident["access_token"], repo["source"])
     # the same limits as an import: the repository on GitHub is whatever it is TODAY, which can be far

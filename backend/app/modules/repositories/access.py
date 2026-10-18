@@ -23,7 +23,8 @@ async def require(ctx: Context, user_id: str, repo_id: str, need: str = "reader"
         role = "reader"  # public: any authenticated user can read
     if RANK[role] < RANK[need]:
         raise Forbidden("You do not have permission to perform this action")
-    if need_storage and not ctx.storage.exists(repo_id):
-        # e.g. ephemeral disk was wiped: metadata survives in Astra, Git data does not
+    if need_storage and not ctx.storage.exists(repo_id) and not repo.get("storage_key"):
+        # the disk is only a cache, so a missing directory is fine as long as a durable copy exists
+        # (GitManager pulls it back on the first git command). Neither one means the data is gone.
         raise Unavailable("Repository storage is unavailable", code="repo_storage_unavailable")
     return repo, role

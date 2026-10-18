@@ -24,7 +24,10 @@ def out(repo: dict, role: str, ctx: Context | None = None) -> RepoOut:
     return RepoOut(**{k: repo[k] for k in ("id", "owner_id", "name", "description", "visibility",
                                            "default_branch", "created_at", "updated_at")}, role=role,
                    source=repo.get("source"),
-                   storage_missing=bool(ctx) and not ctx.storage.exists(repo["id"]))
+                   # not "absent from this instance" - that is normal and self-healing - but
+                   # "no durable copy either", which only a re-import can fix
+                   storage_missing=bool(ctx) and not repo.get("storage_key")
+                   and not ctx.storage.exists(repo["id"]))
 
 
 @router.post("", response_model=RepoOut, status_code=201, dependencies=[Depends(limit_user("repo_create"))])
@@ -41,7 +44,7 @@ async def create_repo(body: RepoCreate, auth: AuthUser = Depends(current_user), 
     except Exception:
         # roll back so a failed init never leaves a phantom repository / blocked name
         await ctx.store.delete_repo(repo["id"])
-        ctx.git.delete_repo(repo["id"])
+        await ctx.git.forget(repo["id"])
         raise
     await ctx.store.index_branch(repo["id"], body.default_branch, sha, auth.id)
     await ctx.store.add_event(repo["id"], auth.id, "repo.created", {"name": body.name})
@@ -78,8 +81,8 @@ async def update_repo(repo_id: str, body: RepoUpdate, auth: AuthUser = Depends(c
 async def delete_repo(repo_id: str, auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
     repo, _ = await require(ctx, auth.id, repo_id, "owner", need_storage=False)
     async with ctx.git.lock(repo["id"]):
-        await ctx.store.delete_repo(repo["id"])  # metadata first; a leftover directory is harmless garbage
-        ctx.git.delete_repo(repo["id"])
+        await ctx.store.delete_repo(repo["id"])  # metadata first; a leftover object is harmless garbage
+        await ctx.git.forget(repo["id"])         # cached copy and the durable one
     log.info("repo_deleted", extra={"repo_id": repo["id"], "user_id": auth.id})
     return Response(status_code=204)
 

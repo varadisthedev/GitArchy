@@ -1,8 +1,8 @@
-"""Repository storage abstraction. Local filesystem implementation only.
+"""Where bare Git repositories sit on this instance's filesystem.
 
-PRODUCTION NOTE: live bare Git repositories need a real POSIX filesystem that persists. Cloudflare R2
-is object storage (not a filesystem) and Render's free disk is ephemeral. Use a persistent disk/volume
-or a dedicated repo service behind this interface; R2 is for bundles/exports/backups only.
+Git cannot read object storage - every command needs a real directory - so this is a *cache*, not the
+record. The durable copy of each repository lives in object storage (integrations.git.mirror), which is
+what makes an ephemeral disk survivable: anything missing here is pulled back on the next git command.
 """
 import os
 import shutil

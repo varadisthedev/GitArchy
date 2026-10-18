@@ -52,6 +52,9 @@ def _clean_ident(s: str) -> str:
 class GitManager:
     def __init__(self, settings: Settings, storage: LocalRepositoryStorage):
         self.cfg, self.storage = settings, storage
+        # set at startup when object storage is configured: the durable copy of every repository.
+        # None keeps the old behaviour (disk only), which is what local development and tests use.
+        self.mirror = None
         self._locks: dict[str, asyncio.Lock] = {}
         self._base_env = {
             k: v for k, v in os.environ.items()
@@ -92,7 +95,22 @@ class GitManager:
         return Result(p.returncode, p.stdout, p.stderr)
 
     async def _run(self, repo_id: str | None, args: list[str], **kw) -> Result:
+        # every read and write for a repository passes through here, so this is the one place that has
+        # to know the disk is only a cache. Creation paths pass repo_id=None and are unaffected.
+        if repo_id is not None and self.mirror and not self.storage.exists(repo_id):
+            await self.mirror.rehydrate(repo_id)
         return await asyncio.to_thread(self._run_sync, repo_id, args, **kw)
+
+    async def _snapshot(self, repo_id: str) -> None:
+        """Make the change durable before the caller is told it succeeded."""
+        if self.mirror:
+            await self.mirror.snapshot(repo_id)
+
+    async def forget(self, repo_id: str) -> None:
+        """Delete a repository for good: the cached copy and the durable one."""
+        self.delete_repo(repo_id)
+        if self.mirror:
+            await self.mirror.forget(repo_id)
 
     def _fail(self, op: str, r: Result, category: str = "failed") -> GitError:
         log.warning("git_failure", extra={"category": category, "op": op, "rc": r.rc})
@@ -162,9 +180,11 @@ class GitManager:
         if not branch:  # detached or empty remote: nothing to serve
             self.storage.remove(repo_id)
             raise InvalidInput("The repository has no branches to import", code="remote_empty")
+        await self._snapshot(repo_id)   # an import is durable the moment it lands, not on first edit
         return branch
 
     def delete_repo(self, repo_id: str) -> None:
+        """Drop the cached copy only. The durable copy in object storage is untouched: see forget()."""
         self.storage.remove(repo_id)
         self._locks.pop(repo_id, None)
 
@@ -188,7 +208,8 @@ class GitManager:
             r = await self._run(repo_id, ["update-ref", f"refs/heads/{name}", sha, ZERO_SHA])
             if r.rc != 0:  # old-value of zero => ref already exists (or D/F ref conflict)
                 raise Conflict("Branch already exists", code="branch_exists")
-            return sha
+        await self._snapshot(repo_id)
+        return sha
 
     # ------------------------------------------------------------ read
     async def tree(self, repo_id: str, ref: str, path: str = "") -> dict:
@@ -350,7 +371,8 @@ class GitManager:
             r = await self._run(repo_id, ["update-ref", f"refs/heads/{branch}", new, parent or ZERO_SHA])
             if r.rc != 0:
                 raise Conflict("Branch was updated concurrently", code="stale_parent")
-            return new
+        await self._snapshot(repo_id)   # outside the lock: the ref is already written
+        return new
 
     # ------------------------------------------------------------ export
     async def create_bundle(self, repo_id: str, dest: Path) -> None:
