@@ -1,5 +1,6 @@
 """Build the bounded dataset a job runs on, from Git history of repositories the job's owner can read."""
 import json
+from itertools import zip_longest
 
 from app.api.dependencies import Context
 from app.core.exceptions import AppError, Forbidden, NotFound
@@ -17,11 +18,11 @@ SURVEY_MAX_REPOS = 50
 SURVEY_MAX_FILES = 40_000
 SURVEY_MAX_MESSAGES = 8_000
 SURVEY_COMMITS_PER_REPO = 200
-# Below this many connected accounts, a reader who is one of them can subtract their own
-# repositories from the total and attribute the remainder. Visibility is the only figure that
-# discloses something otherwise unknowable - that a private repository exists - so below the floor it
-# collapses into one "undisclosed" bucket. The rest of the survey still runs: refusing it outright
-# would cost every figure to protect one.
+# The crowd a private repository hides in. Below this many CONTRIBUTING accounts, a reader who is
+# one of them can subtract their own repositories and attribute the remainder - and what is left is
+# not merely "a private repository exists" but its languages and commit style too. So below the
+# floor the survey covers public repositories only, which disclose nothing that was not already
+# public. Above it, everything counts.
 # ponytail: a fixed minimum cell size, no noise. Per-bucket k-anonymity if the platform ever grows.
 SURVEY_MIN_ACCOUNTS = 5
 
@@ -31,19 +32,27 @@ async def survey_dataset(ctx: Context) -> dict:
 
     Carries no user id, login, repository name, repository id or path ownership - only visibility,
     file paths and commit subjects. A private repository can therefore be counted without anything
-    downstream being able to say whose it is or that it exists.
+    downstream being able to say whose it is or that it exists - but only once SURVEY_MIN_ACCOUNTS
+    accounts are in the dataset to hide it among.
     """
-    accounts = await ctx.store.list_github_users()
     seen: set[str] = set()
-    repos: list[dict] = []
-    for a in accounts:
-        for repo in await ctx.store.list_repos_for_user(a["user_id"]):
-            if repo["id"] not in seen:
-                seen.add(repo["id"])
-                repos.append(repo)
+    by_account: list[list[dict]] = []
+    for a in await ctx.store.list_github_users():
+        mine = [r for r in await ctx.store.list_repos_for_user(a["user_id"]) if r["id"] not in seen]
+        seen.update(r["id"] for r in mine)
+        if mine:
+            by_account.append(mine)
+    # One repository from each account before a second from any. Taking them account by account
+    # would let a single account holding SURVEY_MAX_REPOS crowd every other one out of the survey,
+    # and the floor below would then be counting a crowd that contributed nothing to hide behind.
+    taken = [(i, r) for row in zip_longest(*by_account) for i, r in enumerate(row) if r is not None]
+    taken = taken[:SURVEY_MAX_REPOS]
+    if len({i for i, _ in taken}) < SURVEY_MIN_ACCOUNTS:
+        taken = [(i, r) for i, r in taken if r["visibility"] == "public"]
+    contributors = len({i for i, _ in taken})
+    repos = [r for _, r in taken]
     if not repos:
-        raise DatasetError("No repositories from connected GitHub accounts yet")
-    repos = repos[:SURVEY_MAX_REPOS]
+        raise DatasetError("Not enough public repositories from connected GitHub accounts yet")
     per_repo = max(50, SURVEY_MAX_FILES // len(repos))
     files: list[dict] = []
     messages: list[str] = []
@@ -55,9 +64,8 @@ async def survey_dataset(ctx: Context) -> dict:
             continue  # a repository whose git data is gone simply does not take part
         files += [{"path": f["path"]} for f in tree]
         messages += [c["message"] for c in log_rows]
-    disclose = len(accounts) >= SURVEY_MIN_ACCOUNTS
-    return {"kind": "survey", "accounts": len(accounts),
-            "repos": [{"visibility": r["visibility"] if disclose else "undisclosed"} for r in repos],
+    return {"kind": "survey", "accounts": contributors,
+            "repos": [{"visibility": r["visibility"]} for r in repos],
             "files": files[:SURVEY_MAX_FILES], "messages": messages[:SURVEY_MAX_MESSAGES],
             "rows": len(repos)}
 

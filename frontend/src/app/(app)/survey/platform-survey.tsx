@@ -128,9 +128,7 @@ export function PlatformSurvey() {
             </div>
             <SurveyBar
               title="Public or private"
-              caption={r.visibility.some((g) => g.label === "undisclosed")
-                ? `Across ${plural(r.repos, "repository", "repositories")}. Withheld until more accounts have connected: with this few, a reader could subtract their own repositories and learn that someone else holds a private one.`
-                : `Across ${plural(r.repos, "repository", "repositories")}. Counted blind: the survey never records which account owns which repository.`}
+              caption={`Across ${plural(r.repos, "repository", "repositories")}. Counted blind: the survey never records which account owns which repository.`}
               groups={r.visibility}
             />
             <SurveyBar
@@ -142,7 +140,8 @@ export function PlatformSurvey() {
 
           <p className="mt-10 max-w-[70ch] text-xs text-fg-3">
             Aggregate figures only. No username, repository name or owner is recorded in this result, which is what
-            lets a private repository be counted without disclosing that it exists.
+            lets a private repository be counted without disclosing that it exists — and until five accounts have
+            connected, too few to hide among, only public repositories are surveyed at all.
           </p>
         </>
       ) : null}
