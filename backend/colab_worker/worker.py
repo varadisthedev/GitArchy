@@ -10,6 +10,7 @@ Resilience: reconnects forever with exponential backoff + jitter; abandons the r
 import asyncio
 import json
 import logging
+import math
 import os
 import platform
 import random
@@ -34,7 +35,7 @@ def _jsonable(o):
         return [_jsonable(v) for v in o]
     if hasattr(o, "item"):  # numpy scalar
         return _jsonable(o.item())
-    if isinstance(o, float) and (o != o or o in (float("inf"), float("-inf"))):
+    if isinstance(o, float) and not math.isfinite(o):   # NaN/inf are not JSON
         return None
     return o
 
