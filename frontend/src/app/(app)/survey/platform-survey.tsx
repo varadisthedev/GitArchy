@@ -128,7 +128,9 @@ export function PlatformSurvey() {
             </div>
             <SurveyBar
               title="Public or private"
-              caption={`Across ${plural(r.repos, "repository", "repositories")}. Counted blind: the survey never records which account owns which repository.`}
+              caption={r.visibility.some((g) => g.label === "undisclosed")
+                ? `Across ${plural(r.repos, "repository", "repositories")}. Withheld until more accounts have connected: with this few, a reader could subtract their own repositories and learn that someone else holds a private one.`
+                : `Across ${plural(r.repos, "repository", "repositories")}. Counted blind: the survey never records which account owns which repository.`}
               groups={r.visibility}
             />
             <SurveyBar

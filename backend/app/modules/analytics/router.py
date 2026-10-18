@@ -69,7 +69,9 @@ async def submit(body: JobCreate, auth: AuthUser = Depends(current_user), ctx: C
     if body.task_type in GLOBAL_TASKS:
         # platform-wide scope. There is no repository list to authorise against, and none is needed:
         # the dataset is aggregate-only, so the result cannot disclose a repository to anyone.
-        repo_ids: list[str] = []
+        # Params are the server's, not the caller's: this result is cached and served to every other
+        # reader, so one submitter must not get to choose how much of it everybody else sees.
+        repo_ids, params = [], params_model().model_dump()
     else:
         repo_ids = body.repo_ids if body.repo_ids is not None else await default_repo_ids(ctx, auth.id)
         if not repo_ids:
@@ -122,11 +124,12 @@ async def repo_languages(repo_id: str, auth: AuthUser = Depends(current_user),
 
 
 @router.get("/survey")
-async def survey(ctx: Context = Depends(get_ctx)):
+async def survey(auth: AuthUser = Depends(current_user), ctx: Context = Depends(get_ctx)):
     """The newest platform survey, served from cache so the page is never blank.
 
     Aggregate figures only - no user, login or repository ever appears in the stored result - so any
-    signed-in reader may see it.
+    signed-in reader may see it. Signed-in, though: figures drawn from every connected account are
+    not the anonymous internet's to read, and `auth` is what makes the sentence above true.
     """
     cached = await ctx.store.get_survey()
     return {"result": cached["result"] if cached else None,

@@ -17,14 +17,21 @@ SURVEY_MAX_REPOS = 50
 SURVEY_MAX_FILES = 40_000
 SURVEY_MAX_MESSAGES = 8_000
 SURVEY_COMMITS_PER_REPO = 200
+# Below this many connected accounts, a reader who is one of them can subtract their own
+# repositories from the total and attribute the remainder. Visibility is the only figure that
+# discloses something otherwise unknowable - that a private repository exists - so below the floor it
+# collapses into one "undisclosed" bucket. The rest of the survey still runs: refusing it outright
+# would cost every figure to protect one.
+# ponytail: a fixed minimum cell size, no noise. Per-bucket k-anonymity if the platform ever grows.
+SURVEY_MIN_ACCOUNTS = 5
 
 
 async def survey_dataset(ctx: Context) -> dict:
     """Every repository belonging to an account that has connected GitHub, aggregated blind.
 
-    Carries no user id, login, repository name or path ownership - only visibility, file paths and
-    commit subjects. A private repository can therefore be counted without anything downstream being
-    able to say whose it is or that it exists.
+    Carries no user id, login, repository name, repository id or path ownership - only visibility,
+    file paths and commit subjects. A private repository can therefore be counted without anything
+    downstream being able to say whose it is or that it exists.
     """
     accounts = await ctx.store.list_github_users()
     seen: set[str] = set()
@@ -48,8 +55,9 @@ async def survey_dataset(ctx: Context) -> dict:
             continue  # a repository whose git data is gone simply does not take part
         files += [{"path": f["path"]} for f in tree]
         messages += [c["message"] for c in log_rows]
+    disclose = len(accounts) >= SURVEY_MIN_ACCOUNTS
     return {"kind": "survey", "accounts": len(accounts),
-            "repos": [{"repo_id": r["id"], "visibility": r["visibility"]} for r in repos],
+            "repos": [{"visibility": r["visibility"] if disclose else "undisclosed"} for r in repos],
             "files": files[:SURVEY_MAX_FILES], "messages": messages[:SURVEY_MAX_MESSAGES],
             "rows": len(repos)}
 

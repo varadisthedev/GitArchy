@@ -7,6 +7,7 @@ What this pins down (the parts that break silently):
 - a failed clone leaves no phantom repository and no blocked name
 - the GitHub account -> user binding is exclusive, and OAuth-only accounts cannot password-login
 """
+import json
 import subprocess
 import uuid
 
@@ -19,6 +20,7 @@ from app.integrations.astra.memory import MemoryStore, utcnow
 from app.integrations.git.manager import GitManager
 from app.integrations.git.storage import LocalRepositoryStorage
 from app.core.rate_limit import Limiter
+from app.modules.analytics import datasets
 from app.modules.analytics.datasets import build_dataset
 from app.modules.github import service
 from app.utils.validators import InvalidInput
@@ -334,3 +336,28 @@ def test_local_name_mapping():
     assert service._local_name("...") == "imported-repo"
     assert service._local_name("thing.git") == "thing"
     assert len(service._local_name("x" * 200)) == 64
+
+
+async def test_the_survey_withholds_visibility_until_enough_accounts_have_connected(ctx, remote, monkeypatch):
+    """One connected account must not be able to subtract itself and read the remainder.
+
+    The repository here is private, so a truthful "private: 1" on a two-account platform would tell
+    the other account that a private repository exists. Below the floor the figure collapses; above
+    it, the real split is reported.
+    """
+    _patch_github(monkeypatch, remote)
+    _use_local_remote(monkeypatch, ctx, remote)
+    auth = await _user(ctx)
+    repo, _ = await service.import_repo(ctx, auth, "devuser/notes")
+    assert repo["visibility"] == "private"
+    job = {"task_type": "platform_survey", "user_id": auth.id, "repo_ids": [], "params": {}}
+
+    data = await build_dataset(ctx, job)
+    assert data["kind"] == "survey" and data["accounts"] == 1
+    assert [r["visibility"] for r in data["repos"]] == ["undisclosed"]
+    # and nothing identifying rides along even before the worker aggregates it
+    assert all(set(r) == {"visibility"} for r in data["repos"])
+    assert "devuser" not in json.dumps(data) and repo["id"] not in json.dumps(data)
+
+    monkeypatch.setattr(datasets, "SURVEY_MIN_ACCOUNTS", 1)
+    assert [r["visibility"] for r in (await build_dataset(ctx, job))["repos"]] == ["private"]

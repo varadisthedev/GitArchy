@@ -29,6 +29,8 @@ const COLORS: Record<string, string> = {
   Images: "#7d7572", Fonts: "#6e6866", Video: "#8a807c", Audio: "#79716e", Archives: "#655f5d",
   Documents: "#6b6462", Data: "#847a76", Binaries: "#5c5755", Text: "#736c6a",
   "Source maps": "#605a58", Lockfiles: "#574f4d", Config: "#6a625f",
+  // not a measurement: the survey withholding a figure too small to report anonymously
+  undisclosed: "var(--fg-4)",
 };
 
 /** Stable per-name hue, so an unnamed language keeps the same colour between runs and views. */
