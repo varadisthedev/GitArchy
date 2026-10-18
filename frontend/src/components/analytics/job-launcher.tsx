@@ -73,7 +73,7 @@ export function JobLauncher({ fixedRepoId }: { fixedRepoId?: string }) {
         <div>
           <legend className="label">Operation</legend>
           <div role="radiogroup" aria-label="Operation" className="divide-y divide-line-soft rounded-md border border-line">
-            {TASKS.map((t) => (
+            {TASKS.filter((t) => !t.global).map((t) => (
               <label key={t.type} className="flex cursor-pointer items-start gap-3 px-3.5 py-3 transition-colors hover:bg-surface/50 has-[:checked]:bg-surface">
                 <input type="radio" name="task" className="mt-1" checked={task === t.type} onChange={() => choose(t.type)} />
                 <span className="min-w-0">

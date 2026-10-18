@@ -11,6 +11,8 @@ export type TaskMeta = {
   summary: string;
   spark: string;
   needs?: string;
+  /** Scope is the whole platform, so it takes no repository selection and runs from /survey. */
+  global?: true;
   params: ParamSpec[];
 };
 
@@ -66,6 +68,15 @@ export const TASKS: TaskMeta[] = [
     spark: "RDD map + reduceByKey",
     needs: "Reads the file tree at each repository's default branch.",
     params: [{ key: "top_files", label: "Top filenames", kind: "int", min: 1, max: 50, step: 1, default: 10 }],
+  },
+  {
+    type: "platform_survey",
+    title: "Platform survey",
+    summary: "Every repository on the platform at once: popular languages, public vs private, commit message length.",
+    spark: "RDD map + reduceByKey",
+    needs: "Covers accounts that have connected GitHub. Aggregate only — no account or repository is named.",
+    global: true,
+    params: [{ key: "top_n", label: "Languages shown", kind: "int", min: 3, max: 30, step: 1, default: 12 }],
   },
 ];
 

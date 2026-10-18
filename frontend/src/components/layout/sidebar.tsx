@@ -2,7 +2,7 @@
 
 import {
   Activity, ArrowLeft, BookMarked, ChartNoAxesColumn, CloudDownload, FileCode2, GitBranch,
-  GitCommitHorizontal, LayoutDashboard, Settings, type LucideIcon,
+  GitCommitHorizontal, Globe2, LayoutDashboard, Settings, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,7 @@ const GLOBAL: Item[] = [
   { href: "/import/github", label: "Import", icon: CloudDownload, match: (p) => p.startsWith("/import") },
   { href: "/activity", label: "Activity", icon: Activity, match: (p) => p.startsWith("/activity") },
   { href: "/analytics", label: "Analytics", icon: ChartNoAxesColumn, match: (p) => p.startsWith("/analytics") },
+  { href: "/survey", label: "Survey", icon: Globe2, match: (p) => p.startsWith("/survey") },
 ];
 
 export const REPO_RE = /^\/repositories\/([0-9a-f-]{36})(?:\/([a-z]+))?/;

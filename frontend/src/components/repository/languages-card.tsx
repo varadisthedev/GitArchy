@@ -30,7 +30,7 @@ export function LanguagesCard({ repoId }: { repoId: string }) {
       </div>
       {q.isPending ? <Skeleton className="h-10" /> : null}
       {q.data?.result ? (
-        <LanguageBar languages={q.data.result.languages} totalBytes={q.data.result.total_bytes} />
+        <LanguageBar languages={q.data.result.languages} />
       ) : q.isSuccess ? (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-2">
           No breakdown yet.

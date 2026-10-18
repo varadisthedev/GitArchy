@@ -3,9 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, API_BASE, COLD_START_TIMEOUT_MS } from "./client";
 import type {
-  ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, GithubCallbackResult,
-  GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, RepoLanguages, TaskType,
-  Tree, User, Visibility,
+  ActivityEvent, Branch, Commit, Diff, ExportResult, FileBlob, FileChange, GithubCallbackResult, GithubRepo, GithubStatus, ImportResult, Job, JobResults, Member, Notification, Ready, Repo, RepoLanguages, Survey, TaskType, Tree, User, Visibility,
 } from "./types";
 
 // Keys are hierarchical so one invalidate(["repo", id]) refreshes everything under a repository.
@@ -302,6 +300,14 @@ export const useRestoreRepo = (id: string) => {
       Promise.all([["repo", id], qk.repos, qk.myActivity].map((queryKey) => qc.invalidateQueries({ queryKey }))),
   });
 };
+
+/** The newest platform survey, served from the server's cache so it renders with no worker. */
+export const useSurvey = () =>
+  useQuery({
+    queryKey: ["survey"],
+    queryFn: () => api<Survey>("/analytics/survey"),
+    staleTime: 60_000,
+  });
 
 /** The last single-repository language breakdown, or null until one has been run. */
 export const useRepoLanguages = (id: string) =>

@@ -170,7 +170,14 @@ LANGUAGES = {
     ".pdf": "Documents", ".doc": "Documents", ".docx": "Documents", ".xls": "Documents",
     ".xlsx": "Documents", ".ppt": "Documents", ".pptx": "Documents", ".odt": "Documents", ".rtf": "Documents",
     ".csv": "Data", ".tsv": "Data", ".parquet": "Data", ".avro": "Data", ".orc": "Data",
-    ".db": "Data", ".sqlite": "Data", ".sqlite3": "Data",
+    ".db": "Data", ".sqlite": "Data", ".sqlite3": "Data", ".npy": "Data", ".npz": "Data",
+    ".feather": "Data", ".arrow": "Data", ".dta": "Data", ".sas7bdat": "Data",
+    # trained models and serialised objects: the heavy, uncountable half of an ML repository
+    ".pkl": "Models", ".pickle": "Models", ".joblib": "Models", ".h5": "Models", ".hdf5": "Models",
+    ".onnx": "Models", ".pt": "Models", ".pth": "Models", ".pb": "Models", ".ckpt": "Models",
+    ".safetensors": "Models", ".gguf": "Models", ".ggml": "Models", ".tflite": "Models",
+    ".mlmodel": "Models", ".caffemodel": "Models", ".weights": "Models", ".pmml": "Models",
+    ".sav": "Models", ".model": "Models", ".vec": "Models", ".bst": "Models",
     ".exe": "Binaries", ".dll": "Binaries", ".so": "Binaries", ".dylib": "Binaries", ".wasm": "Binaries",
     ".pyc": "Binaries", ".pyo": "Binaries", ".class": "Binaries", ".o": "Binaries", ".bin": "Binaries",
     ".txt": "Text", ".log": "Text",
@@ -182,12 +189,13 @@ FILENAME_LANGUAGES = {"dockerfile": "Dockerfile", "makefile": "Makefile", "cmake
                       "rakefile": "Ruby", "gemfile": "Ruby", "vagrantfile": "Ruby"}
 
 
-def language_breakdown(spark, params, dataset, progress) -> dict:
-    """map -> reduceByKey over the file tree: bytes and file counts per language, plus common filenames."""
-    rows = dataset.get("files") or []
-    if not rows:
-        raise TaskError("dataset has no files")
-    top_files = int(params.get("top_files", 10))
+def _classifier():
+    """A path -> language function, built fresh so cloudpickle ships it BY VALUE.
+
+    A module-level function would be pickled by reference and executors would have to import this
+    file - the one thing the module docstring forbids. A closure returned from here is anonymous to
+    the pickler, so the lookup tables travel with it.
+    """
     langs, by_name = LANGUAGES, FILENAME_LANGUAGES
 
     def classify(path):
@@ -197,6 +205,16 @@ def language_breakdown(spark, params, dataset, progress) -> dict:
         dot = name.rfind(".")
         return langs.get(name[dot:], "Other") if dot > 0 else "Other"
 
+    return classify
+
+
+def language_breakdown(spark, params, dataset, progress) -> dict:
+    """map -> reduceByKey over the file tree: bytes and file counts per language, plus common filenames."""
+    rows = dataset.get("files") or []
+    if not rows:
+        raise TaskError("dataset has no files")
+    top_files = int(params.get("top_files", 10))
+    classify = _classifier()
     progress(10, "parallelize")
     rdd = spark.sparkContext.parallelize(rows, _slices(len(rows))).cache()
     progress(35, "reduceByKey (languages)")
@@ -217,10 +235,66 @@ def language_breakdown(spark, params, dataset, progress) -> dict:
             "top_files": [{"name": k, "count": c, "share": c / (total_files or 1)} for k, c in names]}
 
 
+# --------------------------------------------------------------------------- platform survey
+# Message-length bands. Ordinal, so they keep this order in the result rather than sorting by size.
+_BANDS = [(10, "1-10 chars"), (25, "11-25"), (50, "26-50"), (72, "51-72"), (10 ** 9, "over 72")]
+
+
+def platform_survey(spark, params, dataset, progress) -> dict:
+    """The heavy one: three reduceByKey passes over every repository on the platform at once.
+
+    Aggregate only. The dataset carries no user, login or repository name, so nothing here can
+    attribute a count to a person - which is what lets a private repository be counted without its
+    existence being disclosed.
+    """
+    repos = dataset.get("repos") or []
+    files = dataset.get("files") or []
+    messages = dataset.get("messages") or []
+    if not repos:
+        raise TaskError("no repositories to survey")
+    top_n = int(params.get("top_n", 12))
+    classify = _classifier()
+    bands = _BANDS
+    sc = spark.sparkContext
+
+    def shares(pairs):
+        total = sum(c for _, c in pairs) or 1
+        return [{"label": k, "count": c, "share": c / total} for k, c in pairs]
+
+    progress(10, "languages: map -> reduceByKey")
+    langs = (sc.parallelize(files, _slices(len(files)))
+             .map(lambda f: (classify(f["path"]), 1))
+             .reduceByKey(lambda a, b: a + b).collect()) if files else []
+    ranked = sorted(langs, key=lambda kv: (-kv[1], kv[0]))
+    head, tail = ranked[:top_n], ranked[top_n:]
+    if tail:
+        head.append(("Other", sum(c for _, c in tail)))
+
+    progress(45, "visibility: map -> reduceByKey")
+    vis = (sc.parallelize(repos, _slices(len(repos)))
+           .map(lambda r: (r["visibility"], 1))
+           .reduceByKey(lambda a, b: a + b).collect())
+
+    progress(75, "commit subjects: map -> reduceByKey")
+    # the subject line is the one git conventions measure; a body would swamp the distribution
+    counted = (sc.parallelize(messages, _slices(len(messages)))
+               .map(lambda m: (next(label for limit, label in bands
+                                    if len((m.splitlines() or [""])[0]) <= limit), 1))
+               .reduceByKey(lambda a, b: a + b).collect()) if messages else []
+    by_band = dict(counted)
+
+    return {"accounts": int(dataset.get("accounts") or 0),
+            "repos": len(repos), "files": len(files), "commits": len(messages),
+            "languages": shares(head),
+            "visibility": shares(sorted(vis, key=lambda kv: (-kv[1], kv[0]))),
+            "message_lengths": shares([(label, by_band.get(label, 0)) for _, label in bands])}
+
+
 TASKS: dict[str, Callable] = {
     "commit_activity_rdd": commit_activity_rdd,
     "message_terms_mapreduce": message_terms_mapreduce,
     "file_stats_sql": file_stats_sql,
     "repo_clustering_kmeans": repo_clustering_kmeans,
     "language_breakdown": language_breakdown,
+    "platform_survey": platform_survey,
 }

@@ -36,6 +36,7 @@ class MemoryStore:
         self.branches: dict[str, dict[str, dict]] = {}
         self.jobs: dict[str, dict] = {}
         self.results: dict[str, list[dict]] = {}
+        self.survey: dict | None = None
         self._seq = 0
 
     async def ping(self) -> bool:
@@ -103,6 +104,16 @@ class MemoryStore:
             ident = self.github.pop(user_id, None)
             if ident:
                 self.github_ids.pop(int(ident["github_id"]), None)
+
+    # ---- platform survey ----
+    async def list_github_users(self) -> list[dict]:
+        return [{"user_id": uid, "login": i.get("login") or ""} for uid, i in self.github.items()]
+
+    async def save_survey(self, job_id: str, result: dict) -> None:
+        self.survey = {"job_id": job_id, "result": result, "measured_at": utcnow()}
+
+    async def get_survey(self) -> dict | None:
+        return dict(self.survey) if self.survey else None
 
     # ---- token revocation ----
     async def revoke_token(self, jti: str, ttl_s: int) -> None:

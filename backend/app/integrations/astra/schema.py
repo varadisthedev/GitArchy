@@ -82,6 +82,15 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         """ALTER TABLE repositories_by_id ADD storage_sha text""",
         """ALTER TABLE repositories_by_id ADD storage_at timestamp""",
     ]),
+    (5, "platform survey", [
+        # github_identity_by_user is keyed by user_id, so nothing could answer "who has connected?".
+        # One bounded partition does, in the shape analytics_open_jobs already uses.
+        """CREATE TABLE IF NOT EXISTS github_users (
+            bucket int, user_id uuid, login text, PRIMARY KEY ((bucket), user_id))""",
+        # the survey is one heavy global job; its newest result is cached so the page is never blank
+        """CREATE TABLE IF NOT EXISTS platform_survey (
+            bucket int PRIMARY KEY, job_id uuid, result text, measured_at timestamp)""",
+    ]),
 ]
 
 VERSION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (

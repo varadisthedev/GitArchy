@@ -239,6 +239,9 @@ class JobManager:
         metrics = {**msg.metrics, "queue_wait_s": round((started - job["created_at"]).total_seconds(), 2),
                    "wall_s": round((utcnow() - started).total_seconds(), 2), "worker_id": w.id}
         done = await self._set(jid, "succeeded", result=msg.result, metrics=metrics, error=None)
+        if done and job["task_type"] in P.GLOBAL_TASKS:
+            # the survey is platform-wide and expensive; cache it so the page renders with no worker
+            await self.store.save_survey(jid, msg.result)
         if done and len(job["repo_ids"]) == 1:
             # only a single-repository run is attributable. A job over several produces ONE aggregate,
             # and storing it against each would show repository B's figures on repository A's page to

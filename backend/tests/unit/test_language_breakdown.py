@@ -128,3 +128,14 @@ def test_a_second_suffix_never_hides_the_real_one():
           run([{"path": "a/bundle.js.map", "size": 10}, {"path": "b/vite.config.ts", "size": 10},
                {"path": "c/class-diagram.puml", "size": 10}])["languages"]}
     assert set(by) == {"Source maps", "TypeScript", "PlantUML"}
+
+
+def test_trained_models_are_named_not_other():
+    """An ML repository is mostly .pkl/.joblib by weight; calling that "Other" explains nothing."""
+    by = {lang["language"]: lang for lang in
+          run([{"path": "app.py", "size": 100}, {"path": "best_model.pkl", "size": 400},
+               {"path": "scaler.joblib", "size": 300}, {"path": "net.safetensors", "size": 100},
+               {"path": "requirements.txt", "size": 50}, {"path": "data/train.npy", "size": 50}])["languages"]}
+    assert by["Models"] == {"language": "Models", "bytes": 800, "files": 3, "share": 800 / 1000}
+    assert by["Python"]["bytes"] == 100 and by["Text"]["bytes"] == 50 and by["Data"]["bytes"] == 50
+    assert "Other" not in by

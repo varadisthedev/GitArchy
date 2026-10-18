@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.api.dependencies import AuthUser, Context, authenticate_token, current_user, get_ctx, limit_user
 from app.core.exceptions import AppError, Conflict, NotFound, Unavailable
 from app.integrations.astra.memory import utcnow
-from app.integrations.spark.protocol import TASKS, TERMINAL, TaskType
+from app.integrations.spark.protocol import GLOBAL_TASKS, TASKS, TERMINAL, TaskType
 from app.modules.analytics.datasets import default_repo_ids
 from app.modules.repositories.access import require
 from app.utils.validators import InvalidInput, parse_uuid
@@ -66,11 +66,16 @@ async def submit(body: JobCreate, auth: AuthUser = Depends(current_user), ctx: C
         params = params_model(**body.params).model_dump()  # strict: unknown keys rejected
     except Exception:
         raise InvalidInput(f"Invalid params for {body.task_type}") from None
-    repo_ids = body.repo_ids if body.repo_ids is not None else await default_repo_ids(ctx, auth.id)
-    if not repo_ids:
-        raise InvalidInput("No repositories to analyse")
-    for rid in repo_ids:
-        await require(ctx, auth.id, rid, "reader")
+    if body.task_type in GLOBAL_TASKS:
+        # platform-wide scope. There is no repository list to authorise against, and none is needed:
+        # the dataset is aggregate-only, so the result cannot disclose a repository to anyone.
+        repo_ids: list[str] = []
+    else:
+        repo_ids = body.repo_ids if body.repo_ids is not None else await default_repo_ids(ctx, auth.id)
+        if not repo_ids:
+            raise InvalidInput("No repositories to analyse")
+        for rid in repo_ids:
+            await require(ctx, auth.id, rid, "reader")
     job = {"id": body.job_id or str(uuid.uuid4()), "user_id": auth.id, "task_type": body.task_type,
            "params": params, "repo_ids": repo_ids, "status": "queued", "attempts": 0, "error": None,
            "result": None, "metrics": None, "created_at": utcnow(), "updated_at": utcnow(),
@@ -114,6 +119,20 @@ async def repo_languages(repo_id: str, auth: AuthUser = Depends(current_user),
         if r["task_type"] == "language_breakdown" and summary.get("repos") == 1:
             return {"result": summary, "job_id": r["job_id"], "finished_at": r["finished_at"]}
     return {"result": None, "job_id": None, "finished_at": None}
+
+
+@router.get("/survey")
+async def survey(ctx: Context = Depends(get_ctx)):
+    """The newest platform survey, served from cache so the page is never blank.
+
+    Aggregate figures only - no user, login or repository ever appears in the stored result - so any
+    signed-in reader may see it.
+    """
+    cached = await ctx.store.get_survey()
+    return {"result": cached["result"] if cached else None,
+            "job_id": cached["job_id"] if cached else None,
+            "measured_at": cached["measured_at"] if cached else None,
+            "worker_available": bool(ctx.jobs and ctx.jobs.worker_available)}
 
 
 @router.post("/jobs/{job_id}/cancel")

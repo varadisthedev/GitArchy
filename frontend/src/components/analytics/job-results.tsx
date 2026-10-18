@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type {
   ActivityResult, FileStatsResult, JobResults, KMeansResult, LanguagesResult, TermsResult,
 } from "@/lib/api/types";
 import { ChartFrame, Churn, Columns, Ranked, VIZ } from "./charts";
-import { LanguageBar } from "./language-bar";
+import { byMetric, LanguageBar, topLanguage, type Metric } from "./language-bar";
 
 type Names = (id: string) => string | undefined;
 
@@ -175,8 +175,15 @@ function KMeans({ r, name }: { r: KMeansResult; name: Names }) {
   );
 }
 
+const METRICS: [Metric, string, string][] = [
+  ["bytes", "Size", "by bytes of the tree"],
+  ["files", "Files", "by number of files"],
+];
+
 function Languages({ r }: { r: LanguagesResult }) {
-  const top = r.languages[0];
+  const [metric, setMetric] = useState<Metric>("bytes");
+  const languages = useMemo(() => byMetric(r.languages, metric), [r.languages, metric]);
+  const top = topLanguage(languages);
   const name = r.top_files[0];
   return (
     <div className="space-y-8">
@@ -189,13 +196,27 @@ function Languages({ r }: { r: LanguagesResult }) {
         ]}
       />
       <section>
-        <h3 className="mb-3 text-sm font-bold">Languages</h3>
-        <LanguageBar languages={r.languages} totalBytes={r.total_bytes} />
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h3 className="text-sm font-bold">Languages</h3>
+          <div role="group" aria-label="Measure languages by" className="ml-auto inline-flex rounded-md border border-line p-0.5">
+            {METRICS.map(([m, label]) => (
+              <button key={m} type="button" aria-pressed={metric === m} onClick={() => setMetric(m)}
+                className={`inline-flex h-6 items-center rounded-sm px-2 text-2xs font-semibold ${metric === m ? "bg-raised text-fg" : "text-fg-2 hover:text-fg"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <LanguageBar languages={languages} />
         <p className="mt-3 max-w-[70ch] text-xs text-fg-2">
           Share of {n(r.total_files)} files across {r.repos === 1 ? "this repository" : `${n(r.repos)} repositories`},
-          measured in bytes of the current tree rather than files changed — so it reflects what the code is, not what
-          was edited recently. Images, fonts and other carried assets are named as what they are; only unrecognised
-          extensions and dotfiles count as Other.
+          measured {metric === "bytes" ? "in bytes of the current tree" : "by how many files carry each extension"} rather
+          than files changed — so it reflects what the code is, not what was edited recently.{" "}
+          {metric === "bytes"
+            ? "A single large asset can outweigh every source file."
+            : "A one-line stylesheet counts the same as a 2 MB model."}{" "}
+          Images, fonts and other carried assets are named as what they are; only unrecognised extensions and dotfiles
+          count as Other.
         </p>
       </section>
       <ChartFrame
@@ -223,6 +244,13 @@ export default function JobResultView({ results, repoName }: { results: JobResul
     case "file_stats_sql": return <FileStats r={r} name={repoName} />;
     case "repo_clustering_kmeans": return <KMeans r={r} name={repoName} />;
     case "language_breakdown": return <Languages r={r} />;
+    case "platform_survey":
+      return (
+        <p className="text-sm text-fg-2">
+          Platform-wide results are shown on the{" "}
+          <Link href="/survey" className="font-bold hover:underline">survey page</Link>.
+        </p>
+      );
     default:
       return <pre className="code-well overflow-auto rounded-md p-4 text-xs">{JSON.stringify(results.result, null, 2)}</pre>;
   }

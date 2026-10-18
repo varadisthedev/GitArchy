@@ -32,7 +32,7 @@ const COLORS: Record<string, string> = {
 };
 
 /** Stable per-name hue, so an unnamed language keeps the same colour between runs and views. */
-function colorFor(language: string): string {
+export function colorFor(language: string): string {
   if (COLORS[language]) return COLORS[language];
   let h = 0;
   for (const ch of language) h = (h * 31 + ch.charCodeAt(0)) % 360;
@@ -44,6 +44,39 @@ const bytes = (v: number) =>
   v < 1024 ? `${v} B` : v < 1024 ** 2 ? `${(v / 1024).toFixed(1)} KB` : `${(v / 1024 ** 2).toFixed(1)} MB`;
 
 type Lang = LanguagesResult["languages"][number];
+
+/** Buckets that are not languages. Mirrors the asset categories in colab_worker/tasks.py. */
+export const ASSET_KINDS = new Set(["Images", "Fonts", "Video", "Audio", "Archives", "Documents",
+  "Data", "Models", "Binaries", "Text", "Source maps", "Lockfiles", "Config", "Other"]);
+
+export type Metric = "bytes" | "files";
+
+/**
+ * Re-express the breakdown as shares of file COUNT instead of bytes.
+ *
+ * Bytes answer "what is this made of"; counts answer "what do people actually write here". A 2 MB
+ * model and a one-line stylesheet are one file each, so counting rescues every language that real
+ * work happens in but which weighs nothing. Both readings are true, which is why the page offers
+ * both rather than picking for the reader.
+ */
+export function byMetric(languages: Lang[], metric: Metric): Lang[] {
+  if (metric === "bytes") return languages;
+  const total = languages.reduce((n, l) => n + l.files, 0) || 1;
+  return languages.map((l) => ({ ...l, share: l.files / total })).sort((a, b) => b.share - a.share);
+}
+
+/**
+ * The headline "most used" bucket, which has to name a language: a repository carrying 11 MB of
+ * screenshots is not "written in" Images.
+ *
+ * The share is left exactly as the server computed it - a share of the whole tree - so the number
+ * agrees with the segment the reader can see in the bar. Renormalising over code only would print
+ * 100% beside a bar segment covering half its width. A tree with no code at all falls back to its
+ * largest bucket, because "-" would be less honest than naming what is actually there.
+ */
+export function topLanguage(languages: Lang[]): Lang | null {
+  return languages.find((l) => !ASSET_KINDS.has(l.language)) ?? languages[0] ?? null;
+}
 
 /**
  * Everything under MIN_SHARE folds into one "Other", which always sorts last.
@@ -69,7 +102,7 @@ export function foldLanguages(languages: Lang[]): Lang[] {
   return folded ? [...shown, other] : shown;
 }
 
-export function LanguageBar({ languages }: { languages: Lang[]; totalBytes?: number }) {
+export function LanguageBar({ languages }: { languages: Lang[] }) {
   const shown = foldLanguages(languages);
 
   return (

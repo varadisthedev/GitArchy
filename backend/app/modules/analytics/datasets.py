@@ -11,9 +11,57 @@ class DatasetError(AppError):
     status, code = 422, "dataset_error"
 
 
+# Survey caps. Chosen so the dataset lands well under analytics_max_dataset_bytes whatever the
+# platform grows to: a survey must never fail for being popular.
+SURVEY_MAX_REPOS = 50
+SURVEY_MAX_FILES = 40_000
+SURVEY_MAX_MESSAGES = 8_000
+SURVEY_COMMITS_PER_REPO = 200
+
+
+async def survey_dataset(ctx: Context) -> dict:
+    """Every repository belonging to an account that has connected GitHub, aggregated blind.
+
+    Carries no user id, login, repository name or path ownership - only visibility, file paths and
+    commit subjects. A private repository can therefore be counted without anything downstream being
+    able to say whose it is or that it exists.
+    """
+    accounts = await ctx.store.list_github_users()
+    seen: set[str] = set()
+    repos: list[dict] = []
+    for a in accounts:
+        for repo in await ctx.store.list_repos_for_user(a["user_id"]):
+            if repo["id"] not in seen:
+                seen.add(repo["id"])
+                repos.append(repo)
+    if not repos:
+        raise DatasetError("No repositories from connected GitHub accounts yet")
+    repos = repos[:SURVEY_MAX_REPOS]
+    per_repo = max(50, SURVEY_MAX_FILES // len(repos))
+    files: list[dict] = []
+    messages: list[str] = []
+    for repo in repos:
+        try:
+            tree = await ctx.git.tree_files(repo["id"], repo["default_branch"], per_repo)
+            log_rows = await ctx.git.analytics_log(repo["id"], repo["default_branch"], SURVEY_COMMITS_PER_REPO)
+        except Exception:
+            continue  # a repository whose git data is gone simply does not take part
+        files += [{"path": f["path"]} for f in tree]
+        messages += [c["message"] for c in log_rows]
+    return {"kind": "survey", "accounts": len(accounts),
+            "repos": [{"repo_id": r["id"], "visibility": r["visibility"]} for r in repos],
+            "files": files[:SURVEY_MAX_FILES], "messages": messages[:SURVEY_MAX_MESSAGES],
+            "rows": len(repos)}
+
+
 async def build_dataset(ctx: Context, job: dict) -> dict:
     cfg = ctx.settings
     kind = TASKS[job["task_type"]][1]
+    if kind == "survey":
+        data = await survey_dataset(ctx)
+        if len(json.dumps(data)) > cfg.analytics_max_dataset_bytes:
+            raise DatasetError("Survey dataset too large")
+        return data
     commits: list[dict] = []
     files: list[dict] = []
     per_repo: dict[str, dict] = {}

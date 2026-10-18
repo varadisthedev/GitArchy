@@ -186,7 +186,8 @@ export type TaskType =
   | "message_terms_mapreduce"
   | "file_stats_sql"
   | "repo_clustering_kmeans"
-  | "language_breakdown";
+  | "language_breakdown"
+  | "platform_survey";
 
 export type JobStatus = "queued" | "dispatched" | "running" | "succeeded" | "failed" | "cancelled";
 
@@ -248,6 +249,28 @@ export interface KMeansResult {
   training_cost: number;
   clusters: { cluster: number; size: number; repo_ids: string[]; mean: Record<string, number> }[];
 }
+/** One slice of a survey bar. Aggregate only: the server never puts a user or repo in these. */
+export interface SurveyGroup {
+  label: string;
+  count: number;
+  share: number;
+}
+export interface SurveyResult {
+  accounts: number;
+  repos: number;
+  files: number;
+  commits: number;
+  languages: SurveyGroup[];
+  visibility: SurveyGroup[];
+  message_lengths: SurveyGroup[];
+}
+export interface Survey {
+  result: SurveyResult | null;
+  job_id: string | null;
+  measured_at: string | null;
+  worker_available: boolean;
+}
+
 export interface RepoLanguages {
   result: LanguagesResult | null;
   job_id: string | null;

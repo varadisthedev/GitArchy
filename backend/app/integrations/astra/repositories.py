@@ -27,6 +27,10 @@ JOB_COLS = {"status", "attempts", "error", "result", "metrics", "updated_at", "s
 JSON_JOB = {"result", "metrics"}
 
 
+# single-partition tables (roster, cached survey): one fixed bucket, as analytics_open_jobs does
+_BUCKET = 0
+
+
 def _u(v) -> uuid.UUID:
     return v if isinstance(v, uuid.UUID) else uuid.UUID(str(v))
 
@@ -154,6 +158,8 @@ class AstraStore:
             "avatar_url, connected_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (uid, gid, ident["login"], ident["access_token"], ident.get("scope", ""),
              ident.get("avatar_url"), ident.get("connected_at") or utcnow()))
+        await self._x("INSERT INTO github_users (bucket, user_id, login) VALUES (?, ?, ?)",
+                      (_BUCKET, uid, ident["login"]))
         if previous and int(previous["github_id"]) != gid:
             # the user switched GitHub accounts: release the old claim, or it would keep signing in
             # as this user and keep anyone else from ever linking that account
@@ -178,6 +184,7 @@ class AstraStore:
     async def clear_github_identity(self, user_id: str) -> None:
         ident = await self.get_github_identity(user_id)
         await self._x("DELETE FROM github_identity_by_user WHERE user_id = ?", (_u(user_id),))
+        await self._x("DELETE FROM github_users WHERE bucket = ? AND user_id = ?", (_BUCKET, _u(user_id)))
         if ident:  # release the claim only if it is still ours
             await self._x("DELETE FROM users_by_github_id WHERE github_id = ? IF user_id = ?",
                           (int(ident["github_id"]), _u(user_id)))
@@ -414,6 +421,24 @@ class AstraStore:
         await self._x("INSERT INTO analytics_results_by_repo (repo_id, finished_at, job_id, task_type, summary) "
                       "VALUES (?, ?, ?, ?, ?)",
                       (_u(repo_id), utcnow(), _u(job_id), task_type, json.dumps(summary)))
+
+    # ---- platform survey ----
+    async def list_github_users(self) -> list[dict]:
+        """Everyone who has connected GitHub. One partition, so this is a read, not a scan."""
+        rows = await self._x("SELECT user_id, login FROM github_users WHERE bucket = ?", (_BUCKET,))
+        return [{"user_id": str(r["user_id"]), "login": r["login"] or ""} for r in rows]
+
+    async def save_survey(self, job_id: str, result: dict) -> None:
+        await self._x("INSERT INTO platform_survey (bucket, job_id, result, measured_at) VALUES (?, ?, ?, ?)",
+                      (_BUCKET, _u(job_id), json.dumps(result), utcnow()))
+
+    async def get_survey(self) -> dict | None:
+        rows = await self._x("SELECT * FROM platform_survey WHERE bucket = ?", (_BUCKET,))
+        if not rows:
+            return None
+        r = rows[0]
+        return {"job_id": str(r["job_id"]), "result": json.loads(r["result"]),
+                "measured_at": _ts(r["measured_at"])}
 
     async def list_repo_results(self, repo_id: str, limit: int) -> list[dict]:
         rows = await self._x("SELECT * FROM analytics_results_by_repo WHERE repo_id = ? LIMIT ?",
