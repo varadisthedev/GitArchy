@@ -1,5 +1,7 @@
 """R2 and Cloudinary through mocked clients - no credentials or network."""
+import asyncio
 import io
+import time
 import uuid
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -101,6 +103,19 @@ async def test_r2_status_probes_once_then_caches(tmp_path, s3):
 
     s3.head_bucket = gone
     assert await r2.status(ttl=0) == "unavailable"   # ttl=0 forces a re-probe
+
+
+async def test_r2_status_is_single_flight(tmp_path, s3):
+    """A burst of /ready requests must cost one probe: each one holds a thread git also needs."""
+    def slow(Bucket):
+        s3.calls.append(("head_bucket", Bucket, 0))
+        time.sleep(0.05)
+        return {}
+
+    s3.head_bucket = slow
+    r2 = R2Client(r2_settings(tmp_path), s3=s3)
+    assert await asyncio.gather(*(r2.status() for _ in range(5))) == ["ok"] * 5
+    assert sum(c[0] == "head_bucket" for c in s3.calls) == 1
 
 
 def test_r2_endpoint_derivation(tmp_path):

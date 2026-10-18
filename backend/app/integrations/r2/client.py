@@ -32,6 +32,7 @@ class R2Client:
         self._timeout = settings.external_timeout_s
         self._checked_at: float | None = None  # None, not 0.0: time.monotonic() may start above any ttl
         self._status = "unavailable"
+        self._probe = asyncio.Lock()
         self.s3 = s3 or boto3.client(
             "s3", endpoint_url=endpoint, region_name=region,
             aws_access_key_id=key_id, aws_secret_access_key=secret,
@@ -46,17 +47,28 @@ class R2Client:
         return True
 
     async def status(self, ttl: float = 60.0) -> str:
-        """"ok" or "unavailable", cached: /ready is polled by every open tab and head_bucket is a real call."""
-        now = time.monotonic()
-        if self._checked_at is not None and now - self._checked_at < ttl:
+        """"ok" or "unavailable", cached: /ready is polled by every open tab and head_bucket is a real call.
+
+        Single-flight: /ready needs no auth, so without the lock a burst of concurrent requests would each
+        start a probe, and every probe holds a thread from the same default executor that git runs on.
+        Waiters re-read the cache the holder just filled instead of probing again. Failures are cached too,
+        so an unreachable bucket costs one call per ttl rather than one per request.
+        """
+        if self._fresh(ttl):
             return self._status
-        try:
-            await asyncio.wait_for(self.ping(), self._timeout)
-            self._status = "ok"
-        except Exception:  # credentials rejected, bucket gone, endpoint unreachable: all "unavailable" to a user
-            self._status = "unavailable"
-        self._checked_at = now
-        return self._status
+        async with self._probe:
+            if self._fresh(ttl):  # filled while we waited
+                return self._status
+            try:
+                await asyncio.wait_for(self.ping(), self._timeout)
+                self._status = "ok"
+            except Exception:  # credentials rejected, bucket gone, endpoint unreachable: all "unavailable"
+                self._status = "unavailable"
+            self._checked_at = time.monotonic()
+            return self._status
+
+    def _fresh(self, ttl: float) -> bool:
+        return self._checked_at is not None and time.monotonic() - self._checked_at < ttl
 
     async def upload_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream",
                            metadata: dict | None = None) -> str:
