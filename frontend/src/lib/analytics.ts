@@ -70,6 +70,18 @@ export const TASKS: TaskMeta[] = [
     params: [{ key: "top_files", label: "Top filenames", kind: "int", min: 1, max: 50, step: 1, default: 10 }],
   },
   {
+    type: "language_clustering_kmeans",
+    title: "Language clustering",
+    summary: "Groups repositories by the languages they are written in with K-Means — Python and notebooks together, JS/TS together.",
+    spark: "MLlib KMeans",
+    needs: "Reads the file tree at each repository's default branch. Needs at least k repositories with source files.",
+    params: [
+      { key: "k", label: "Clusters (k)", kind: "int", min: 2, max: 10, step: 1, default: 3 },
+      { key: "max_iter", label: "Max iterations", kind: "int", min: 1, max: 50, step: 1, default: 20 },
+      SEED,
+    ],
+  },
+  {
     type: "platform_survey",
     title: "Platform survey",
     summary: "Every repository on the platform at once: popular languages, public vs private, commit message length.",

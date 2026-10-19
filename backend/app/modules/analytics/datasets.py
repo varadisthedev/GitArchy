@@ -123,8 +123,11 @@ async def build_dataset(ctx: Context, job: dict) -> dict:
     n = len(commits) if kind == "commits" else len(files) if kind == "files" else len(per_repo)
     if n == 0:
         raise DatasetError("No data to analyse")
-    if job["task_type"] == "repo_clustering_kmeans" and n < job["params"].get("k", 3):
-        raise DatasetError("Need at least k repositories for clustering")
+    if job["task_type"].endswith("_kmeans"):
+        # both clustering tasks cluster repositories, but one counts commit rows and the other files
+        in_scope = len(per_repo) if kind == "repos" else len({f["repo_id"] for f in files})
+        if in_scope < job["params"].get("k", 3):
+            raise DatasetError("Need at least k repositories for clustering")
     return {"kind": kind, **data, "rows": n}
 
 

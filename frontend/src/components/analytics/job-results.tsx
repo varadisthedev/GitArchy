@@ -131,6 +131,8 @@ const FEATURE_LABEL: Record<string, string> = { commits: "Commits", additions: "
 
 function KMeans({ r, name }: { r: KMeansResult; name: Names }) {
   const feats = Object.keys(r.clusters[0]?.mean ?? {});
+  // language clustering means are percentages of a repository's source files, not raw counts
+  const byLanguage = r.languages != null;
   return (
     <div className="space-y-8">
       <Facts
@@ -143,12 +145,17 @@ function KMeans({ r, name }: { r: KMeansResult; name: Names }) {
       {r.silhouette == null ? <p className="text-xs text-fg-3">Silhouette needs at least two non-empty clusters.</p> : null}
       <section>
         <h3 className="mb-1 text-sm font-bold">Clusters</h3>
-        <p className="mb-3 text-xs text-fg-2">Average activity per repository in each cluster. Repositories in the same cluster have similar profiles.</p>
+        <p className="mb-3 text-xs text-fg-2">
+          {byLanguage
+            ? "Average share of each repository's source files per language family. Repositories in the same cluster are written in the same stack."
+            : "Average activity per repository in each cluster. Repositories in the same cluster have similar profiles."}
+        </p>
         <div className="overflow-x-auto rounded-md border border-line">
           <table className="data-table min-w-[40rem] text-xs">
             <thead>
               <tr>
                 <th scope="col">Cluster</th>
+                {byLanguage ? <th scope="col">Mainly</th> : null}
                 <th scope="col">Repositories</th>
                 {feats.map((f) => <th key={f} scope="col" className="!text-right">{FEATURE_LABEL[f] ?? f}</th>)}
               </tr>
@@ -157,6 +164,7 @@ function KMeans({ r, name }: { r: KMeansResult; name: Names }) {
               {r.clusters.map((c) => (
                 <tr key={c.cluster} className="align-top">
                   <td className="font-mono font-semibold whitespace-nowrap">#{c.cluster + 1} <span className="font-sans font-normal text-fg-3">({c.size})</span></td>
+                  {byLanguage ? <td className="font-semibold whitespace-nowrap">{c.label ?? "—"}</td> : null}
                   <td>
                     <ul className="flex flex-wrap gap-x-2 gap-y-1">
                       {c.repo_ids.map((id) => (
@@ -164,7 +172,7 @@ function KMeans({ r, name }: { r: KMeansResult; name: Names }) {
                       ))}
                     </ul>
                   </td>
-                  {feats.map((f) => <td key={f} className="text-right font-mono">{n(c.mean[f])}</td>)}
+                  {feats.map((f) => <td key={f} className="text-right font-mono">{byLanguage ? `${c.mean[f]}%` : n(c.mean[f])}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -244,6 +252,7 @@ export default function JobResultView({ results, repoName }: { results: JobResul
     case "file_stats_sql": return <FileStats r={r} name={repoName} />;
     case "repo_clustering_kmeans": return <KMeans r={r} name={repoName} />;
     case "language_breakdown": return <Languages r={r} />;
+    case "language_clustering_kmeans": return <KMeans r={r} name={repoName} />;
     case "platform_survey":
       return (
         <p className="text-sm text-fg-2">

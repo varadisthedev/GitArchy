@@ -101,3 +101,22 @@ def test_language_breakdown_matches_a_hand_count(spark):
     assert out["top_files"][0] == {"name": "readme.md", "count": 2, "share": 2 / 9}
     with pytest.raises(TaskError):
         TASKS["language_breakdown"](spark, {}, {"files": []}, noop)
+
+
+def test_language_clustering_groups_repos_by_stack(spark):
+    def tree(repo, names):
+        return [{"repo_id": repo, "path": f"src/{i}{ext}", "size": 100} for i, ext in enumerate(names)]
+    files = (tree("py1", [".py"] * 6) + tree("py2", [".py", ".py", ".ipynb"])
+             + tree("nb1", [".ipynb"] * 5)
+             + tree("js1", [".js"] * 4) + tree("js2", [".ts", ".tsx", ".js"])
+             # assets and docs must not pull a repository into a cluster of its own
+             + tree("js3", [".js", ".js", ".png", ".png", ".md", ".json"]))
+    out = TASKS["language_clustering_kmeans"](spark, {"k": 2, "seed": 1, "max_iter": 20}, {"files": files}, noop)
+    groups = sorted(sorted(c["repo_ids"]) for c in out["clusters"])
+    assert groups == [["js1", "js2", "js3"], ["nb1", "py1", "py2"]]
+    assert sorted(c["label"] for c in out["clusters"]) == ["JavaScript/TypeScript", "Python"]
+    assert {r["repo_id"]: r["language"] for r in out["repos"]}["nb1"] == "Python"
+    with pytest.raises(TaskError):
+        TASKS["language_clustering_kmeans"](spark, {"k": 9}, {"files": files}, noop)
+    with pytest.raises(TaskError):
+        TASKS["language_clustering_kmeans"](spark, {}, {"files": []}, noop)

@@ -49,12 +49,14 @@ TASKS: dict[str, tuple[type[BaseModel], str]] = {
     "file_stats_sql": (FileStatsParams, "commits"),           # DataFrame + Spark SQL
     "repo_clustering_kmeans": (KMeansParams, "repos"),        # MLlib KMeans
     "language_breakdown": (LanguagesParams, "files"),        # RDD map + reduceByKey over the tree
+    "language_clustering_kmeans": (KMeansParams, "files"),    # MLlib KMeans over each repo's language mix
     "platform_survey": (SurveyParams, "survey"),             # RDD map + reduceByKey, every repository at once
 }
 # Scope is the whole platform, not a chosen set of repositories, and the result is aggregate only.
 GLOBAL_TASKS = {"platform_survey"}
 TaskType = Literal["commit_activity_rdd", "message_terms_mapreduce", "file_stats_sql",
-                   "repo_clustering_kmeans", "language_breakdown", "platform_survey"]
+                   "repo_clustering_kmeans", "language_breakdown", "language_clustering_kmeans",
+                   "platform_survey"]
 
 # ---------------------------------------------------------------- messages
 

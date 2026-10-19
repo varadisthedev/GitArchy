@@ -203,6 +203,7 @@ export type TaskType =
   | "file_stats_sql"
   | "repo_clustering_kmeans"
   | "language_breakdown"
+  | "language_clustering_kmeans"
   | "platform_survey";
 
 export type JobStatus = "queued" | "dispatched" | "running" | "succeeded" | "failed" | "cancelled";
@@ -263,7 +264,10 @@ export interface KMeansResult {
   k: number;
   silhouette: number | null;
   training_cost: number;
-  clusters: { cluster: number; size: number; repo_ids: string[]; mean: Record<string, number> }[];
+  /** Language clustering only: the families the table has columns for, and the dominant one per repo. */
+  languages?: string[];
+  repos?: { repo_id: string; language: string; share: number }[];
+  clusters: { cluster: number; size: number; repo_ids: string[]; mean: Record<string, number>; label?: string }[];
 }
 /** One slice of a survey bar. Aggregate only: the server never puts a user or repo in these. */
 export interface SurveyGroup {

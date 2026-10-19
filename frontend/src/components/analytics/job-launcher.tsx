@@ -47,7 +47,7 @@ export function JobLauncher({ fixedRepoId }: { fixedRepoId?: string }) {
     const repoIds = fixedRepoId ? [fixedRepoId] : scope === "pick" ? [...picked] : undefined;
     if (repoIds && !repoIds.length) return setErr("Pick at least one repository.");
     if (repoIds && repoIds.length > 20) return setErr("A job can cover at most 20 repositories.");
-    if (task === "repo_clustering_kmeans") {
+    if (task === "repo_clustering_kmeans" || task === "language_clustering_kmeans") {
       const n = repoIds?.length ?? repos.data?.length ?? 0;
       if (n < Number(params.k)) return setErr(`Clustering into ${params.k} groups needs at least ${params.k} repositories in scope (you have ${n}).`);
     }

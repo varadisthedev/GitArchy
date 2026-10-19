@@ -72,6 +72,7 @@ Task types and params (strict; unknown keys are rejected):
 | `message_terms_mapreduce` | RDD `flatMap` + `map` + `reduceByKey` | `top_n 1-100` |
 | `file_stats_sql` | DataFrame + Spark SQL | `top_n 1-100` |
 | `repo_clustering_kmeans` | MLlib KMeans | `k 2-10, max_iter 1-50, seed` (needs >= k repositories) |
+| `language_clustering_kmeans` | MLlib KMeans over per-repo language-family shares | `k 2-10, max_iter 1-50, seed` (needs >= k repositories with source files) |
 | `commit_classification_logreg` | MLlib LogisticRegression (is-bug-fix from size features) | `train_fraction 0.5-0.9, seed` |
 
 Job `status`: `queued`, `dispatched`, `running`, `succeeded`, `failed`, `cancelled`.

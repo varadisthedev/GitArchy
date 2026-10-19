@@ -235,6 +235,110 @@ def language_breakdown(spark, params, dataset, progress) -> dict:
             "top_files": [{"name": k, "count": c, "share": c / (total_files or 1)} for k, c in names]}
 
 
+# --------------------------------------------------------------------------- language clustering
+# Languages that belong to one stack. Clustering on raw per-language shares would put a notebook
+# repository as far from a .py one as from a .js one - every one-hot share vector is equidistant -
+# so a repository's features are shares per FAMILY, and .py + .ipynb land in the same column.
+FAMILIES = {
+    "Python": ("Python", "Jupyter Notebook"),
+    "JavaScript/TypeScript": ("JavaScript", "TypeScript", "Vue", "Svelte", "Astro"),
+    "JVM": ("Java", "Kotlin", "Scala", "Groovy", "Clojure"),
+    "C/C++": ("C", "C++", "Objective-C", "Assembly"),
+    ".NET": ("C#", "F#", "Visual Basic"),
+    "Shell": ("Shell", "PowerShell", "Batch", "Awk", "Makefile", "CMake", "Gradle"),
+    "Web markup": ("HTML", "CSS", "SCSS", "Less", "Stylus", "Handlebars", "EJS", "Pug", "Twig", "Liquid"),
+    "Lisp": ("Lisp", "Scheme", "Racket", "Emacs Lisp"),
+    "Functional ML": ("OCaml", "Haskell", "Elm", "Erlang", "Elixir"),
+}
+# What a repository CARRIES rather than is written in. Counting these would cluster by asset mix:
+# two unrelated repositories that both ship a lot of PNGs are not the same stack.
+NOT_CODE = {"Images", "Fonts", "Video", "Audio", "Archives", "Documents", "Data", "Models",
+            "Binaries", "Text", "Source maps", "Lockfiles", "Config", "JSON", "YAML", "TOML",
+            "XML", "INI", "Markdown", "reStructuredText", "AsciiDoc", "TeX", "Other",
+            "PlantUML", "Mermaid", "Graphviz", "HTTP", "Vim Script"}
+
+
+def _family():
+    """language -> family, or None for anything that isn't source. Closure so cloudpickle ships the
+    tables by value (same reason as _classifier)."""
+    by_lang = {lang: fam for fam, langs in FAMILIES.items() for lang in langs}
+    not_code = NOT_CODE
+
+    def family(language):
+        return None if language in not_code else by_lang.get(language, language)
+
+    return family
+
+
+def language_clustering_kmeans(spark, params: dict, dataset: dict, progress: Progress) -> dict:
+    """K-Means over each repository's language mix: repositories written in the same stack group up.
+
+    Features are the shares of a repository's source files per language family - unscaled, because a
+    share is already a 0-1 fraction and standardising would blow a rare language up to the weight of
+    the one the repository is actually written in.
+    """
+    from pyspark.ml.clustering import KMeans
+    from pyspark.ml.evaluation import ClusteringEvaluator
+    from pyspark.ml.feature import VectorAssembler
+    from pyspark.sql import functions as F
+    rows = dataset.get("files") or []
+    if not rows:
+        raise TaskError("dataset has no files")
+    k = int(params.get("k", 3))
+    classify, family = _classifier(), _family()
+    progress(10, "map -> reduceByKey (languages per repository)")
+    counted = (spark.sparkContext.parallelize(rows, _slices(len(rows)))
+               .map(lambda f: ((f.get("repo_id"), family(classify(f["path"]))), 1))
+               .filter(lambda kv: kv[0][1] is not None)
+               .reduceByKey(lambda a, b: a + b).collect())
+    per_repo: dict[str, dict[str, int]] = {}
+    for (repo_id, fam), c in counted:
+        per_repo.setdefault(repo_id, {})[fam] = c
+    if len(per_repo) < k:
+        raise TaskError("need at least k repositories with recognised source files")
+
+    langs = sorted({f for d in per_repo.values() for f in d})
+    dominant = {rid: min(d, key=lambda f: (-d[f], f)) for rid, d in per_repo.items()}
+    progress(40, "kmeans")
+    feature_rows = [(rid, dominant[rid], *[d.get(f, 0) / sum(d.values()) for f in langs])
+                    for rid, d in per_repo.items()]
+    df = spark.createDataFrame(feature_rows, ["repo_id", "dominant", *langs])
+    feats = VectorAssembler(inputCols=langs, outputCol="features").transform(df)
+    model = KMeans(k=k, seed=int(params.get("seed", 42)), maxIter=int(params.get("max_iter", 20)),
+                   featuresCol="features").fit(feats)
+    pred = model.transform(feats)
+    silhouette = None
+    try:
+        silhouette = float(ClusteringEvaluator(featuresCol="features").evaluate(pred))
+    except Exception:  # needs >= 2 non-empty clusters
+        pass
+
+    progress(80, "summarise")
+    # the table shows the families that actually carry the dataset; the rest would be columns of 0.0
+    shown = sorted(langs, key=lambda f: -sum(d.get(f, 0) for d in per_repo.values()))[:6]
+    summary = (pred.groupBy("prediction").agg(F.count("*").alias("size"), *[F.avg(c).alias(c) for c in langs])
+               .orderBy("prediction").collect())
+    members: dict[int, list[str]] = {}
+    for r in pred.select("repo_id", "prediction").collect():
+        members.setdefault(int(r["prediction"]), []).append(r["repo_id"])
+    clusters = []
+    for s in summary:
+        cid = int(s["prediction"])
+        ids = members[cid]
+        tally = {}
+        for rid in ids:
+            tally[dominant[rid]] = tally.get(dominant[rid], 0) + 1
+        clusters.append({"cluster": cid, "size": int(s["size"]),
+                         "label": min(tally, key=lambda f: (-tally[f], f)),
+                         "repo_ids": ids,
+                         "mean": {f: round(float(s[f]) * 100, 1) for f in shown}})
+    return {"k": k, "silhouette": silhouette, "training_cost": float(model.summary.trainingCost),
+            "languages": shown, "clusters": clusters,
+            "repos": [{"repo_id": rid, "language": dominant[rid],
+                       "share": per_repo[rid][dominant[rid]] / sum(per_repo[rid].values())}
+                      for rid in sorted(per_repo, key=lambda r: dominant[r])]}
+
+
 # --------------------------------------------------------------------------- platform survey
 # Message-length bands. Ordinal, so they keep this order in the result rather than sorting by size.
 _BANDS = [(10, "1-10 chars"), (25, "11-25"), (50, "26-50"), (72, "51-72"), (10 ** 9, "over 72")]
@@ -296,5 +400,6 @@ TASKS: dict[str, Callable] = {
     "file_stats_sql": file_stats_sql,
     "repo_clustering_kmeans": repo_clustering_kmeans,
     "language_breakdown": language_breakdown,
+    "language_clustering_kmeans": language_clustering_kmeans,
     "platform_survey": platform_survey,
 }
