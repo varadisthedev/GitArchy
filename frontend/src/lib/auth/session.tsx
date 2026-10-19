@@ -7,7 +7,7 @@ import { COLD_START_TIMEOUT_MS, api, setAuthToken, setUnauthorizedHandler } from
 import { qk } from "@/lib/api/queries";
 import type { TokenResponse, User } from "@/lib/api/types";
 
-// Backend contract: 30-minute bearer JWT, no refresh tokens, logout revokes the jti server-side.
+// Backend contract: a bearer JWT whose lifetime the server sets (JWT_EXPIRY_MINUTES), no refresh tokens, logout revokes the jti server-side.
 // The token is kept in memory and sessionStorage (one tab, gone when the tab closes), never in localStorage or cookies.
 const KEY = "gitarchy.session.v1";
 

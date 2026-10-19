@@ -52,7 +52,7 @@ export function AccountSettings() {
       <Section id="st-h" title="Storage" description="Repository bundle downloads are built on the server and stored in object storage. Checked against the bucket itself, not just the configuration.">
         <StorageStatus />
       </Section>
-      <Section id="ses-h" title="Session" description="Sessions last 24 hours and aren't refreshed. Signing out revokes this session's token on the server.">
+      <Section id="ses-h" title="Session" description="A session lasts as long as the server's token and is never refreshed. Signing out revokes this session's token on the server.">
         <SessionInfo />
       </Section>
     </div>
@@ -189,9 +189,13 @@ function SessionInfo() {
     return () => window.clearInterval(t);
   }, []);
   const mins = expiresAt ? Math.max(0, Math.round((expiresAt - now) / 60_000)) : null;
+  // a day-long token in minutes reads as noise, so anything past two hours is said in hours
+  const left = mins == null ? null : mins < 1 ? "under a minute"
+    : mins < 120 ? `${mins} minute${mins === 1 ? "" : "s"}`
+    : `${Math.round(mins / 60)} hours`;
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <p className="text-sm text-fg-2">{mins == null ? "" : mins < 1 ? "Ends in under a minute." : `Ends in about ${mins} minute${mins === 1 ? "" : "s"}.`}</p>
+      <p className="text-sm text-fg-2">{left == null ? "" : mins! < 1 ? "Ends in under a minute." : `Ends in about ${left}.`}</p>
       <button className="btn" disabled={busy} onClick={async () => { setBusy(true); await logout(); }}>
         {busy ? <Spinner /> : <LogOut aria-hidden />} Sign out
       </button>
