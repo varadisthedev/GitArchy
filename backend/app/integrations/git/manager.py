@@ -177,6 +177,19 @@ class GitManager:
             self.storage.remove(repo_id)  # a partial clone must not look like a real repository
             log.warning("git_clone_failed", extra={"repo_id": repo_id, "rc": r.rc})
             raise GitError("Could not clone the repository from its remote", code="clone_failed")
+        # The caller's pre-check trusts GitHub's `size`, which is rounded to whole KB and refreshed
+        # asynchronously - a repository that grew since the last refresh reports the old figure. So
+        # the cap is enforced again against what actually landed.
+        # ponytail: the clone has already written to disk by the time this runs, so it bounds what
+        # is KEPT, not peak usage. A disk quota or a sandboxed clone is the fix if that matters.
+        cap = self.cfg.github_max_repo_kb * 1024
+        on_disk = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+        if on_disk > cap:  # compared in bytes: truncating to whole KB is the very hole being closed
+            self.storage.remove(repo_id)
+            log.warning("git_clone_over_cap", extra={"repo_id": repo_id, "bytes": on_disk})
+            raise InvalidInput(f"That repository is {on_disk // 1_048_576} MB once cloned, over "
+                               f"this server's {self.cfg.github_max_repo_kb // 1024} MB limit",
+                               code="repo_too_large")
         head = await self._run(repo_id, ["symbolic-ref", "--short", "--quiet", "HEAD"])
         branch = head.out.decode(errors="replace").strip()
         # A remote with no commits clones fine and still reports a branch name: HEAD is a symbolic

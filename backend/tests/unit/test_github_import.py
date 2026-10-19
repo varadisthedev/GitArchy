@@ -229,6 +229,19 @@ async def test_a_small_repo_is_not_mistaken_for_an_empty_one(ctx, remote, monkey
     assert repo["default_branch"] == "trunk" and summary["commits_indexed"] == 2
 
 
+async def test_a_clone_bigger_than_github_claimed_is_refused(ctx, remote, monkeypatch):
+    """GitHub's `size` is stale-able, so a repository can under-report and clone in far larger.
+    The cap must hold against what actually landed on disk."""
+    auth = await _user(ctx)
+    _patch_github(monkeypatch, remote, size_kb=0)          # GitHub says it is tiny
+    _use_local_remote(monkeypatch, ctx, remote)
+    monkeypatch.setattr(ctx.git.cfg, "github_max_repo_kb", 0)  # ...and anything at all is too big
+    with pytest.raises(InvalidInput) as e:
+        await service.import_repo(ctx, auth, "devuser/notes")
+    assert e.value.code == "repo_too_large"
+    assert await ctx.store.list_repos_for_user(auth.id) == []
+
+
 async def test_a_remote_with_no_commits_is_refused(ctx, remote, monkeypatch, tmp_path):
     auth = await _user(ctx)
     bare = tmp_path / "bare-empty.git"
