@@ -179,7 +179,10 @@ class GitManager:
             raise GitError("Could not clone the repository from its remote", code="clone_failed")
         head = await self._run(repo_id, ["symbolic-ref", "--short", "--quiet", "HEAD"])
         branch = head.out.decode(errors="replace").strip()
-        if not branch:  # detached or empty remote: nothing to serve
+        # A remote with no commits clones fine and still reports a branch name: HEAD is a symbolic
+        # ref to a branch that was never created, so the name proves nothing. Count the refs.
+        refs = await self._run(repo_id, ["for-each-ref", "--count=1", "refs/heads"])
+        if not branch or not refs.out.strip():  # detached or empty remote: nothing to serve
             self.storage.remove(repo_id)
             raise InvalidInput("The repository has no branches to import", code="remote_empty")
         await self._snapshot(repo_id)   # an import is durable the moment it lands, not on first edit

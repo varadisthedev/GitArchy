@@ -211,17 +211,34 @@ async def test_failed_clone_leaves_nothing_behind(ctx, remote, monkeypatch):
     assert await ctx.store.list_repos_for_user(auth.id) == []
 
 
-async def test_empty_and_oversized_repos_are_refused(ctx, remote, monkeypatch):
+async def test_oversized_repos_are_refused(ctx, remote, monkeypatch):
     auth = await _user(ctx)
-    _patch_github(monkeypatch, remote, empty=True)
-    with pytest.raises(InvalidInput) as e:
-        await service.import_repo(ctx, auth, "devuser/notes")
-    assert e.value.code == "remote_empty"
-
     _patch_github(monkeypatch, remote, size_kb=ctx.settings.github_max_repo_kb + 1)
     with pytest.raises(InvalidInput) as e:
         await service.import_repo(ctx, auth, "devuser/notes")
     assert e.value.code == "repo_too_large"
+
+
+async def test_a_small_repo_is_not_mistaken_for_an_empty_one(ctx, remote, monkeypatch):
+    """GitHub reports `size` in whole KB rounded down, so two small files read as 0. That must
+    import, and only a remote with no branches may be refused as empty."""
+    auth = await _user(ctx)
+    _patch_github(monkeypatch, remote, size_kb=0)
+    _use_local_remote(monkeypatch, ctx, remote)
+    repo, summary = await service.import_repo(ctx, auth, "devuser/notes")
+    assert repo["default_branch"] == "trunk" and summary["commits_indexed"] == 2
+
+
+async def test_a_remote_with_no_commits_is_refused(ctx, remote, monkeypatch, tmp_path):
+    auth = await _user(ctx)
+    bare = tmp_path / "bare-empty.git"
+    _git("init", "--bare", "--quiet", "--initial-branch=trunk", str(bare), cwd=tmp_path)
+    _patch_github(monkeypatch, remote, size_kb=0)
+    _use_local_remote(monkeypatch, ctx, bare)
+    with pytest.raises(InvalidInput) as e:
+        await service.import_repo(ctx, auth, "devuser/notes")
+    assert e.value.code == "remote_empty"
+    assert await ctx.store.list_repos_for_user(auth.id) == []  # nothing left behind
 
 
 async def test_github_account_binds_to_one_user(ctx):

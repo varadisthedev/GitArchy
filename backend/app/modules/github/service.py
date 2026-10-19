@@ -170,7 +170,7 @@ async def list_remote_repos(ctx: Context, user_id: str) -> list[dict]:
         # exact when the repository was imported after `source` existed; the name match still catches
         # older imports, at the cost of a false positive if the user renamed one
         r["imported"] = r["full_name"] in sources or _local_name(r["name"]).lower() in mine
-        r["importable"] = not r["empty"] and r["size_kb"] <= ctx.settings.github_max_repo_kb
+        r["importable"] = r["size_kb"] <= ctx.settings.github_max_repo_kb
     return repos
 
 
@@ -263,8 +263,9 @@ async def restore_repo(ctx: Context, auth: AuthUser, repo_id: str) -> tuple[dict
 def _vet_clone(ctx: Context, gh: dict) -> None:
     """What must hold before we hand a URL to git. Import and restore share it: a repository that
     could not be imported today must not arrive through restore either."""
-    if gh["empty"]:
-        raise InvalidInput("That repository is empty, so there is nothing to clone", code="remote_empty")
+    # Emptiness is not pre-judged here: GitHub's `size` can't tell a small repository from an empty
+    # one, and clone_bare already refuses a remote with no branches (code="remote_empty") and cleans
+    # up after itself. Guessing cost real imports; let git be the authority.
     if gh["size_kb"] > ctx.settings.github_max_repo_kb:
         raise InvalidInput(
             f"That repository is {gh['size_kb'] // 1024} MB, over this server's "

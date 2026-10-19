@@ -150,7 +150,12 @@ def _repo(r: dict) -> dict:
             "owner": str((r.get("owner") or {}).get("login") or ""),
             "description": (r.get("description") or "")[:500],
             "private": bool(r.get("private")), "fork": bool(r.get("fork")),
-            "archived": bool(r.get("archived")), "empty": (r.get("size") or 0) == 0,
+            "archived": bool(r.get("archived")),
+            # NOT size == 0: GitHub reports size in whole KB rounded down and updates it
+            # asynchronously, so a repository holding a couple of small files reads as 0. A
+            # repository that has never been pushed to is the one thing GitHub does say plainly.
+            # Advisory only - git decides at clone time whether there is anything to import.
+            "empty": r.get("pushed_at") is None,
             "default_branch": str(r.get("default_branch") or "main"),
             "language": r.get("language"), "size_kb": int(r.get("size") or 0),
             "stars": int(r.get("stargazers_count") or 0),

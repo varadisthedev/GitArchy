@@ -307,7 +307,8 @@ function RowStatus({ repo, outcome }: { repo: GithubRepo; outcome?: Outcome }) {
     );
   }
   if (repo.imported) return <p className="mt-1 text-2xs text-fg-3">A repository with this name is already here.</p>;
-  if (repo.empty) return <p className="mt-1 text-2xs text-fg-3">Empty on GitHub — nothing to import.</p>;
+  // a hint, not a block: only the server's clone can actually tell an empty remote from a small one
+  if (repo.empty) return <p className="mt-1 text-2xs text-fg-3">Never pushed to on GitHub — may have nothing to import.</p>;
   if (!repo.importable) return <p className="mt-1 text-2xs text-fg-3">Larger than this server&apos;s import limit.</p>;
   return null;
 }
