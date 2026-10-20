@@ -1,6 +1,6 @@
 # Gitarchy
 
-A self-hosted, GitHub-style code host with Spark analytics built into the platform rather than bolted on
+GitHub-style code host with Spark analytics built into the platform rather than bolted on
 beside it. Users, repositories, roles, branches, files, commits, diffs, code search and activity — plus
 distributed jobs that run over your own git history and stream their progress back to the page you started
 them from.
